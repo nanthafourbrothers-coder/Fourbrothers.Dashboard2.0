@@ -45,7 +45,7 @@ export default function MovementsPage() {
   if (type) initialFilters = { type: { set: [type] } };
   else if (params.get("unlinked")) initialFilters = { linked: { set: ["Not linked"] } };
 
-  const columns: GridColumn<Movement>[] = [
+  const columns: GridColumn<Movement>[] = useMemo(() => [
     { key: "date", label: "Date", type: "date", editable: true, width: 110 },
     {
       key: "type", label: "Type", options: ["IN", "OUT", "ADJUST"], editable: true,
@@ -68,7 +68,7 @@ export default function MovementsPage() {
     { key: "source", label: "Source", hidden: true },
     { key: "notes", label: "Notes", editable: true, hidden: true },
     { key: "created_at", label: "Saved at", type: "datetime", hidden: true, get: (m) => m.created_at.slice(0, 16).replace("T", " ") },
-  ];
+  ], [nameById]);
 
   return (
     <div className="space-y-4">
