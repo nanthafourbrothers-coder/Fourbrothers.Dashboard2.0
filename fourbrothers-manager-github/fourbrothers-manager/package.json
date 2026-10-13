@@ -1,0 +1,40 @@
+{
+  "name": "fourbrothers-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FOURBROTHERS MANAGER: stock in/out, shipments and data hub for fourbrothers.in",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test:parsers": "tsx tests/parsers.test.ts",
+    "test:e2e": "node tests/e2e-full.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "clsx": "^2.1.1",
+    "exceljs": "^4.4.0",
+    "fflate": "^0.8.3",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
+    "lucide-react": "^1.56.0",
+    "next": "^15.5.27",
+    "papaparse": "^5.7.0",
+    "pdfjs-dist": "^4.10.38",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "autoprefixer": "^10.6.1",
+    "playwright-core": "^1.64.0",
+    "postcss": "^8.5.30",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}
