@@ -191,7 +191,13 @@ export function DataGrid<T>(p: Props<T>) {
 
   useEffect(() => setPage(0), [q, filters, sort, pageSize]);
   const onViewChange = p.onViewChange;
+  // Report the filtered rows to the screen, but only when they really changed. Without this guard a screen that
+  // keeps the rows in state and rebuilds its columns on every render would loop forever and freeze page changes.
+  const lastView = useRef<T[] | null>(null);
   useEffect(() => {
+    const prev = lastView.current;
+    if (prev && prev.length === view.length && prev.every((r, i) => r === view[i])) return;
+    lastView.current = view;
     onViewChange?.(view);
   }, [view, onViewChange]);
   const pages = Math.max(1, Math.ceil(view.length / pageSize));
