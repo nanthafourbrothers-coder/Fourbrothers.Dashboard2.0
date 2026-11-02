@@ -10,6 +10,7 @@ import { unmappedNames } from "@/lib/stock";
 import { useStockRows } from "@/lib/data/useStock";
 import { addDaysYmd, aliasKey, formatDateDisplay, formatNumber, todayYmd } from "@/lib/parse/normalize";
 import type { Movement } from "@/lib/types";
+import { LowStockAlert } from "@/components/LowStockAlert";
 import { Badge, EmptyState, Field, PageHeader, Spinner, Stat, useLocalPref } from "@/components/ui";
 
 type Range = "7" | "30" | "90" | "365" | "all" | "custom";
@@ -102,9 +103,17 @@ export default function DashboardPage() {
     const items = new Map<string, number>();
     const channels = new Map<string, number>();
     const states = new Map<string, number>();
+    const parties = new Map<string, number>();
+    const received = new Map<string, number>();
     for (const m of inRange) {
+      if (m.type === "IN") {
+        const label = m.product_id ? (nameOf.get(m.product_id) ?? m.raw_name) : aliasKey(m.raw_name);
+        received.set(label, (received.get(label) ?? 0) + (Number(m.qty) || 0));
+      }
       if (m.type !== "OUT") continue;
       const q = Number(m.qty) || 0;
+      const pt = m.party || "Not set";
+      parties.set(pt, (parties.get(pt) ?? 0) + q);
       const label = m.product_id ? (nameOf.get(m.product_id) ?? m.raw_name) : aliasKey(m.raw_name);
       items.set(label, (items.get(label) ?? 0) + q);
       const ch = m.channel || "Not set";
@@ -113,7 +122,7 @@ export default function DashboardPage() {
       states.set(st, (states.get(st) ?? 0) + q);
     }
     const top = (map: Map<string, number>, n: number) => [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, n);
-    return { items: top(items, 8), channels: top(channels, 6), states: top(states, 8) };
+    return { items: top(items, 8), channels: top(channels, 6), states: top(states, 8), parties: top(parties, 8), received: top(received, 8) };
   }, [inRange, nameOf]);
 
   const attention = useMemo(() => stock.filter((s) => s.flag !== "ok" && s.flag !== "uncounted").sort((a, b) => a.on_hand - b.on_hand), [stock]);
@@ -178,6 +187,8 @@ export default function DashboardPage() {
             <Stat label="Shipments to send" value={openShipments} sub="Pending or packed" href="/shipments" />
           </div>
 
+          <LowStockAlert />
+
           {(unmapped > 0 || counts.neg > 0 || counts.uncounted > 0) && (
             <div className="card flex flex-wrap items-center gap-x-6 gap-y-1 border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-900">
               {unmapped > 0 && (
@@ -222,7 +233,7 @@ export default function DashboardPage() {
             {chart.data.length ? <BarChart data={chart.data} /> : <p className="py-10 text-center text-sm text-ink-500">No stock movement in this period.</p>}
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <Panel title="Top selling items (period)">
               <Bars rows={breakdowns.items} />
             </Panel>
@@ -234,22 +245,16 @@ export default function DashboardPage() {
             </Panel>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Panel title="Needs restocking" action={<Link className="text-xs text-brand-700 hover:underline" href="/stock?flag=attention">See all {attention.length}</Link>}>
-              {attention.length === 0 ? (
-                <p className="py-6 text-center text-sm text-ink-500">Nothing is out or low.</p>
-              ) : (
-                <ul className="divide-y divide-ink-100 text-sm">
-                  {attention.slice(0, 8).map((s) => (
-                    <li key={s.id} className="flex items-center gap-2 py-1.5">
-                      <span className="min-w-0 flex-1 truncate">{s.name}</span>
-                      <b className="tabular-nums">{formatNumber(s.on_hand)}</b>
-                      <Badge tone={s.flag === "low" ? "amber" : "red"}>{s.flag === "low" ? "Low" : s.flag === "out" ? "Out" : "Below zero"}</Badge>
-                    </li>
-                  ))}
-                </ul>
-              )}
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <Panel title="Top customers / parties (period)" action={<Link className="text-xs text-brand-700 hover:underline" href="/movements?type=OUT">Sales register</Link>}>
+              <Bars rows={breakdowns.parties} />
             </Panel>
+            <Panel title="Most received (period)" action={<Link className="text-xs text-brand-700 hover:underline" href="/movements?type=IN">Receipts</Link>}>
+              <Bars rows={breakdowns.received} empty="No receipts in this period." />
+            </Panel>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
             <Panel title="Latest entries" action={<Link className="text-xs text-brand-700 hover:underline" href="/movements">Open all</Link>}>
               <ul className="divide-y divide-ink-100 text-sm">
                 {recent.map((m: Movement) => (
@@ -272,8 +277,8 @@ export default function DashboardPage() {
 
 function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="card p-4">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="card min-w-0 p-4">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
         {action}
       </div>
@@ -282,8 +287,8 @@ function Panel({ title, action, children }: { title: string; action?: React.Reac
   );
 }
 
-function Bars({ rows }: { rows: [string, number][] }) {
-  if (!rows.length) return <p className="py-6 text-center text-sm text-ink-500">No sales in this period.</p>;
+function Bars({ rows, empty = "No sales in this period." }: { rows: [string, number][]; empty?: string }) {
+  if (!rows.length) return <p className="py-6 text-center text-sm text-ink-500">{empty}</p>;
   const max = Math.max(...rows.map((r) => r[1]), 1);
   return (
     <ul className="space-y-2 text-sm">

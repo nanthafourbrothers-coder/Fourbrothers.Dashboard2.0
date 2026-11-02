@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+*.tsbuildinfo
+.env
+.env.local
+.env*.local
+samples
+# customer data must never be committed
+*.csv
+*.xlsx
+*.zip
+!tests/**

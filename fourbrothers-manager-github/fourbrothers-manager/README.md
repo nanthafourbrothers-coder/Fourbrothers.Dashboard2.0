@@ -21,6 +21,10 @@ Built with Next.js, Supabase (login, database, file storage) and Vercel. Both Ve
 
 Roles: viewer can only look. Staff can add and edit stock lines, shipments and section rows. Manager can also import, edit stock items and sections, delete, and run the Shopify sync. Admin can also manage users and settings.
 
+## Dashboard 2.0
+
+See `CHANGES.md` for every file. Highlights: product popup with period, filters and charts; Sales register and Receipts; "Needs attention" low-stock alert (limit you choose, default 100); Update stock from Excel; locked imported data with manual add allowed; full ZIP backup; phone layout.
+
 ## Try it on your computer (demo mode)
 
 ```bash

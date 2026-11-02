@@ -297,7 +297,7 @@ function ShipmentModal({ shipment, existing = [], onClose, canWrite = true, canM
         }
       >
         <fieldset disabled={!editable} className="contents">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Field label="Date *"><input className="input" type="date" value={f.ship_date} onChange={set("ship_date")} /></Field>
             <Field label="Customer name *" className="sm:col-span-2"><input className="input" value={f.customer_name} onChange={set("customer_name")} autoFocus={!shipment} /></Field>
             <Field label="Phone"><input className="input" inputMode="tel" value={f.phone} onChange={set("phone")} /></Field>

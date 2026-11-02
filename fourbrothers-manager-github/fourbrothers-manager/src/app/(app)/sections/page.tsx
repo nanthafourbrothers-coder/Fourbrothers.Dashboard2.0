@@ -52,7 +52,7 @@ export default function SectionsPage() {
           <EmptyState title="No sections yet" text="Upload any spreadsheet and choose New section. Its data is saved and a page for it is added to the menu." action={<Link href="/import" className="btn btn-primary">Import a file</Link>} />
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {sorted.map((d) => (
             <Link key={d.id} href={`/sections/${d.slug}`} className="card block p-4 transition hover:border-brand-300 hover:shadow-pop">
               <div className="flex items-start gap-3">

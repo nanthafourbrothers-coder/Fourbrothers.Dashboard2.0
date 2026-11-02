@@ -2,15 +2,17 @@
 
 import { useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Archive, GitMerge } from "lucide-react";
+import { Archive, FileSpreadsheet, GitMerge, Lock } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { db, useTable } from "@/lib/data/store";
 import type { StockRow } from "@/lib/stock";
-import { useStockRows } from "@/lib/data/useStock";
+import { useDataLocked, useStockRows } from "@/lib/data/useStock";
 import { formatDateDisplay, formatNumber } from "@/lib/parse/normalize";
 import type { Product } from "@/lib/types";
 import { DataGrid, type GridColumn } from "@/components/DataGrid";
 import { StockItemModal } from "@/components/StockItemModal";
+import { LowStockAlert } from "@/components/LowStockAlert";
+import { StockExcelModal } from "@/components/StockExcelModal";
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, useUi } from "@/components/ui";
 import Link from "next/link";
 
@@ -26,23 +28,19 @@ export default function StockPage() {
   const [adding, setAdding] = useState(false);
   const [merging, setMerging] = useState<string[] | null>(null);
   const [showArchived, setShowArchived] = useState(false);
+  const [excel, setExcel] = useState(false);
+  const locked = useDataLocked();
 
   const { rows, since } = useStockRows(showArchived);
   const flag = params.get("flag");
   const initialFilters = flag ? { flag: { set: flag === "attention" ? ["low", "out", "negative"] : [flag] } } : undefined;
 
-  const canEdit = auth.can("manage");
+  const canAdd = auth.can("manage"); // adding items by hand is always allowed for managers
+  const canEdit = canAdd && !locked; // changing existing items is locked unless an admin switches the lock off in Settings
   const columns: GridColumn<StockRow>[] = [
-    { key: "name", label: "Item", editable: true, width: 260 },
-    { key: "sku", label: "SKU", editable: true },
-    { key: "category", label: "Category", editable: true },
-    { key: "location", label: "Location", editable: true },
-    { key: "opening_qty", label: "Opening", type: "number", editable: true, digits: 0 },
-    { key: "in_qty", label: "In", type: "number", digits: 0, sum: true },
-    { key: "out_qty", label: "Out", type: "number", digits: 0, sum: true },
-    { key: "adjust_qty", label: "Adjusted", type: "number", digits: 0, hidden: true },
+    { key: "name", label: "Product", editable: true, width: 320 },
     {
-      key: "on_hand", label: "On hand", type: "number", digits: 0, sum: true,
+      key: "on_hand", label: "Current stock", type: "number", digits: 0, sum: true,
       render: (r) => <b className={r.flag === "ok" || r.flag === "uncounted" ? "" : r.flag === "low" ? "text-amber-700" : "text-red-700"}>{formatNumber(r.on_hand)}</b>,
     },
     {
@@ -51,11 +49,18 @@ export default function StockPage() {
       format: (v) => FLAG_LABEL[String(v)] ?? String(v),
       render: (r) => (r.flag === "ok" ? <span className="text-ink-400">In stock</span> : <Badge tone={r.flag === "uncounted" ? "gray" : r.flag === "low" ? "amber" : "red"}>{FLAG_LABEL[r.flag]}</Badge>),
     },
-    { key: "reorder_level", label: "Reorder at", type: "number", editable: true, digits: 0 },
-    { key: "shopify_qty", label: "Shopify qty", type: "number", digits: 0 },
-    { key: "variance", label: "App minus Shopify", type: "number", digits: 0, hidden: true },
     { key: "last_out", label: "Last sold", type: "date" },
-    { key: "price", label: "Price", type: "number", editable: true },
+    { key: "opening_qty", label: "Opening", type: "number", editable: true, digits: 0, hidden: true },
+    { key: "in_qty", label: "In", type: "number", digits: 0, sum: true, hidden: true },
+    { key: "out_qty", label: "Out", type: "number", digits: 0, sum: true, hidden: true },
+    { key: "adjust_qty", label: "Adjusted", type: "number", digits: 0, hidden: true },
+    { key: "sku", label: "SKU", editable: true, hidden: true },
+    { key: "category", label: "Category", editable: true, hidden: true },
+    { key: "location", label: "Location", editable: true, hidden: true },
+    { key: "reorder_level", label: "Reorder at", type: "number", editable: true, digits: 0, hidden: true },
+    { key: "shopify_qty", label: "Shopify qty", type: "number", digits: 0, hidden: true },
+    { key: "variance", label: "App minus Shopify", type: "number", digits: 0, hidden: true },
+    { key: "price", label: "Price", type: "number", editable: true, hidden: true },
     { key: "cost", label: "Cost", type: "number", editable: true, hidden: true },
     { key: "unit", label: "Unit", editable: true, hidden: true },
     { key: "vendor", label: "Vendor", hidden: true },
@@ -69,30 +74,53 @@ export default function StockPage() {
     <div className="space-y-4">
       <PageHeader
         title="Stock items"
-        subtitle="Stock on hand = opening stock + purchases (in) - sales (out) + adjustments. Double click a cell to edit it. Click a row for its full history."
+        subtitle="Every product with its current stock. Click a product to see opening, in, out and on hand for any period and place, with charts and customer history."
         actions={
-          <Link href="/import" className="btn">
-            Import a file
-          </Link>
+          <>
+            {canAdd && (
+              <Button onClick={() => setExcel(true)}>
+                <FileSpreadsheet className="h-4 w-4" /> Update stock from Excel
+              </Button>
+            )}
+            <Link href="/import" className="btn">
+              Import purchase / sales files
+            </Link>
+          </>
         }
       />
       {products.loaded && products.rows.length === 0 ? (
         <div className="card">
-          <EmptyState
-            title="No stock items yet"
-            text="Import your Tally invoice register or a Shopify inventory file to build the list, or add items one by one."
-            action={
-              <div className="flex gap-2">
-                <Link href="/import" className="btn btn-primary">
-                  Import files
-                </Link>
-                {canEdit && <Button onClick={() => setAdding(true)}>Add an item</Button>}
-              </div>
-            }
-          />
+          {movements.rows.length > 0 ? (
+            <EmptyState
+              title="Your files are in. Now build the stock list."
+              text={`${formatNumber(movements.rows.length)} stock lines are saved but not linked to any product yet. Open Name matching: it suggests which purchase and sales names are the same product, and creates the stock items for you.`}
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Link href="/mapping" className="btn btn-primary">
+                    Match names and build the list
+                  </Link>
+                  {canAdd && <Button onClick={() => setAdding(true)}>Add an item</Button>}
+                </div>
+              }
+            />
+          ) : (
+            <EmptyState
+              title="No stock items yet"
+              text="Import your Tally invoice register or purchase book to build the list, or add items one by one."
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Link href="/import" className="btn btn-primary">
+                    Import files
+                  </Link>
+                  {canAdd && <Button onClick={() => setAdding(true)}>Add an item</Button>}
+                </div>
+              }
+            />
+          )}
         </div>
       ) : (
         <>
+          <LowStockAlert showWhenEmpty />
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Link href="/stock" className={`rounded-full border px-3 py-1 ${!flag ? "border-brand-500 bg-brand-50 text-brand-800" : "border-ink-200 bg-white hover:bg-ink-50"}`}>
               All
@@ -115,6 +143,11 @@ export default function StockPage() {
               <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived
             </label>
           </div>
+          {locked && (
+            <p className="flex items-center gap-1.5 text-xs text-ink-500">
+              <Lock className="h-3.5 w-3.5" /> Imported data is locked and cannot be edited. To correct a figure, enter a stock count in the product, or add items by hand. {auth.can("admin") && <Link className="text-brand-700 underline" href="/settings">Lock settings</Link>}
+            </p>
+          )}
           {since && (
             <p className="text-xs text-ink-500">
               Counting stock from {formatDateDisplay(since)}. Earlier lines stay saved but are not counted, because opening stock is the count on that day. <Link className="text-brand-700 underline" href="/settings">Change</Link>
@@ -139,11 +172,11 @@ export default function StockPage() {
             onDelete={async (ids) => {
               await db.remove("products", ids);
             }}
-            onAdd={canEdit ? () => setAdding(true) : undefined}
+            onAdd={canAdd ? () => setAdding(true) : undefined}
             addLabel="Add item"
             onRowClick={(r) => setOpen(r.id)}
             bulkActions={
-              canEdit
+              canAdd
                 ? [
                     { label: "Merge into one item", onClick: (ids) => (ids.length < 2 ? toast("info", "Select at least two items to merge.") : setMerging(ids)) },
                     {
@@ -161,7 +194,8 @@ export default function StockPage() {
           />
         </>
       )}
-      {open && rows.find((r) => r.id === open) && <StockItemModal item={rows.find((r) => r.id === open)!} onClose={() => setOpen(null)} />}
+      {open && rows.find((r) => r.id === open) && <StockItemModal key={open} item={rows.find((r) => r.id === open)!} onClose={() => setOpen(null)} onOpenProduct={(id) => setOpen(id)} />}
+      {excel && <StockExcelModal stock={rows} onClose={() => setExcel(false)} />}
       {adding && <AddItemModal onClose={() => setAdding(false)} />}
       {merging && <MergeModal ids={merging} rows={rows} onClose={() => setMerging(null)} />}
     </div>
@@ -200,7 +234,7 @@ function AddItemModal({ onClose }: { onClose: () => void }) {
   };
   return (
     <Modal title="Add stock item" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" busy={busy} onClick={save}>Add item</Button></>}>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Item name *" className="sm:col-span-2"><input className="input" value={f.name} onChange={set("name")} autoFocus /></Field>
         <Field label="SKU / code"><input className="input" value={f.sku} onChange={set("sku")} /></Field>
         <Field label="Category"><input className="input" value={f.category} onChange={set("category")} /></Field>

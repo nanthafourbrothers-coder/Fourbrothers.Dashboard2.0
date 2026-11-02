@@ -306,7 +306,7 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
           {/* destination */}
           <div>
             <p className="label">Where should this go?</p>
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {allowed.map((d) => (
                 <button
                   key={d}
@@ -326,7 +326,7 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
           {/* movement options */}
           {dest === "movements" && (
             <div className="space-y-3 rounded-lg border border-ink-200 p-3">
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <Field label="Direction of stock">
                   <select className="input" value={direction} onChange={(e) => setDirection(e.target.value as "IN" | "OUT" | "auto")}>
                     <option value="auto">Decide from voucher type</option>
@@ -425,7 +425,7 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
                   </Field>
                 </div>
               ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <Field label="Section">
                     <select className="input" value={dsTarget} onChange={(e) => setDsTarget(e.target.value)}>
                       <option value="">Choose…</option>
@@ -496,7 +496,7 @@ function MappingEditor({ title, fields, table, mapping, onChange }: { title: str
   return (
     <div>
       <p className="label">{title}</p>
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
         {fields.map((f) => (
           <label key={f.key} className="flex items-center gap-2 text-sm">
             <span className="w-40 shrink-0 text-ink-700">

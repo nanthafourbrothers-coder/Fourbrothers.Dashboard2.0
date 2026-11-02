@@ -2,13 +2,14 @@
 
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import clsx from "clsx";
 import {
-  Activity, ArrowLeftRight, Boxes, Database, FileUp, Layers, LayoutDashboard, Link2, Loader2, LogOut, Menu, PackageCheck, Search, Settings, Shuffle, Users, X, Truck,
+  Activity, ArrowDownToLine, Bell, Boxes, Database, FileUp, Layers, LayoutDashboard, Link2, Loader2, LogOut, Menu, PackageCheck, Receipt, Search, Settings, Shuffle, Users, X, Truck,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useTable } from "@/lib/data/store";
+import { useStockRows } from "@/lib/data/useStock";
 import { unmappedNames } from "@/lib/stock";
 import { ROLE_LABELS } from "@/lib/permissions";
 import { Badge, Button, Spinner } from "./ui";
@@ -65,6 +66,8 @@ function ShellInner({ children }: { children: ReactNode }) {
   const movements = useTable("stock_movements");
   const aliases = useTable("product_aliases");
   useTable("products");
+  const { rows: stockRows } = useStockRows();
+  const needAttention = useMemo(() => stockRows.filter((r) => r.flag === "low" || r.flag === "out" || r.flag === "negative").length, [stockRows]);
 
   useEffect(() => setOpen(false), [pathname]);
 
@@ -74,25 +77,26 @@ function ShellInner({ children }: { children: ReactNode }) {
   const groups: { title: string; items: NavItem[] }[] = [
     { title: "Overview", items: [{ href: "/", label: "Dashboard", icon: <LayoutDashboard className="h-4 w-4" /> }] },
     {
-      title: "Inventory",
+      title: "Stock",
       items: [
-        { href: "/stock", label: "Stock items", icon: <Boxes className="h-4 w-4" /> },
-        { href: "/movements", label: "Stock in and out", icon: <ArrowLeftRight className="h-4 w-4" /> },
-        { href: "/mapping", label: "Name matching", icon: <Shuffle className="h-4 w-4" />, badge: unmapped },
+        { href: "/stock", label: "Stock items", icon: <Boxes className="h-4 w-4" />, badge: needAttention },
+        { href: "/movements?type=OUT", label: "Sales register", icon: <Receipt className="h-4 w-4" /> },
+        { href: "/movements?type=IN", label: "Receipts (purchases)", icon: <ArrowDownToLine className="h-4 w-4" /> },
       ],
     },
+    { title: "Dispatch", items: [{ href: "/shipments", label: "Shipments", icon: <Truck className="h-4 w-4" /> }] },
     {
       title: "Files and data",
       items: [
-        { href: "/import", label: "Import files", icon: <FileUp className="h-4 w-4" /> },
-        { href: "/sections", label: "All sections", icon: <Layers className="h-4 w-4" /> },
+        { href: "/import", label: "Upload files", icon: <FileUp className="h-4 w-4" /> },
+        { href: "/sections", label: "Sections", icon: <Layers className="h-4 w-4" /> },
       ],
     },
-    { title: "Dispatch", items: [{ href: "/shipments", label: "Shipments and photos", icon: <Truck className="h-4 w-4" /> }] },
-    { title: "Connect", items: [{ href: "/integrations", label: "Shopify, Tally, API", icon: <Link2 className="h-4 w-4" /> }] },
     {
-      title: "Admin",
+      title: "More",
       items: [
+        { href: "/mapping", label: "Name matching", icon: <Shuffle className="h-4 w-4" />, badge: unmapped },
+        { href: "/integrations", label: "Shopify, Tally, API", icon: <Link2 className="h-4 w-4" />, need: "manage" },
         { href: "/users", label: "Users", icon: <Users className="h-4 w-4" />, need: "admin" },
         { href: "/activity", label: "Activity log", icon: <Activity className="h-4 w-4" />, need: "manage" },
         { href: "/settings", label: "Settings and backup", icon: <Settings className="h-4 w-4" />, need: "manage" },
@@ -100,49 +104,19 @@ function ShellInner({ children }: { children: ReactNode }) {
     },
   ];
 
-  const active = (href: string) => (href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(href + "/"));
-
   const nav = (
-    <nav className="flex-1 overflow-y-auto px-3 pb-6">
-      {groups.map((g) => {
-        const items = g.items.filter((i) => !i.need || auth.can(i.need));
-        if (!items.length) return null;
-        return (
-          <div key={g.title} className="mt-4">
-            <p className="px-2 pb-1 text-[11px] font-semibold text-ink-400">{g.title}</p>
-            {items.map((i) => (
-              <Link
-                key={i.href}
-                href={i.href}
-                className={clsx(
-                  "flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition",
-                  active(i.href) ? "bg-brand-50 text-brand-700" : "text-ink-700 hover:bg-ink-100",
-                )}
-              >
-                {i.icon}
-                <span className="flex-1 truncate">{i.label}</span>
-                {i.badge ? <Badge tone="amber">{i.badge}</Badge> : null}
-              </Link>
-            ))}
-            {g.title === "Files and data" && sections.length > 0 && (
-              <div className="mt-1 border-l border-ink-200 pl-2.5 ml-4">
-                {sections.map((d) => (
-                  <Link
-                    key={d.id}
-                    href={`/sections/${d.slug}`}
-                    className={clsx("flex items-center gap-2 truncate rounded-md px-2 py-1 text-[13px]", active(`/sections/${d.slug}`) ? "bg-brand-50 font-medium text-brand-700" : "text-ink-600 hover:bg-ink-100")}
-                  >
-                    <Database className="h-3.5 w-3.5 shrink-0 text-ink-400" />
-                    <span className="truncate">{d.name}</span>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </nav>
+    <Suspense fallback={null}>
+      <NavList groups={groups} sections={sections} />
+    </Suspense>
   );
+
+  const bottom = [
+    { href: "/", label: "Home", icon: <LayoutDashboard className="h-5 w-5" /> },
+    { href: "/stock", label: "Stock", icon: <Boxes className="h-5 w-5" /> },
+    { href: "/movements?type=OUT", label: "Sales", icon: <Receipt className="h-5 w-5" /> },
+    { href: "/movements?type=IN", label: "Receipts", icon: <ArrowDownToLine className="h-5 w-5" /> },
+    { href: "/shipments", label: "Shipments", icon: <Truck className="h-5 w-5" /> },
+  ];
 
   const brand = (
     <Link href="/" className="flex items-center gap-2.5 px-5 py-4">
@@ -193,6 +167,10 @@ function ShellInner({ children }: { children: ReactNode }) {
             <input className="input pl-8" placeholder="Search everything: item, invoice, customer, phone, city…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search everything" />
           </form>
           <div className="ml-auto flex items-center gap-3">
+            <Link href="/stock?flag=attention" className="relative rounded-lg p-1.5 hover:bg-ink-100" aria-label={needAttention ? `${needAttention} stock items need attention` : "No stock alerts"} title={needAttention ? `${needAttention} stock items need attention` : "No stock alerts"}>
+              <Bell className="h-5 w-5" />
+              {needAttention > 0 && <span className="absolute -right-0.5 -top-0.5 min-w-[1.1rem] rounded-full bg-brand-600 px-1 text-center text-[10px] font-semibold leading-[1.1rem] text-white">{needAttention > 99 ? "99+" : needAttention}</span>}
+            </Link>
             {auth.mode === "local" && (
               <span className="hidden rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 sm:inline" title="Supabase keys are not set, so data stays in this browser only.">
                 Demo mode: data stays in this browser
@@ -209,10 +187,87 @@ function ShellInner({ children }: { children: ReactNode }) {
             )}
           </div>
         </header>
-        <main className="mx-auto max-w-[1500px] p-4 sm:p-6">
+        <main className="mx-auto max-w-[1500px] p-4 pb-24 sm:p-6 lg:pb-6">
           <Suspense fallback={<Spinner />}>{children}</Suspense>
         </main>
       </div>
+      {/* phone bottom bar */}
+      <Suspense fallback={null}>
+        <BottomBar items={bottom} onMore={() => setOpen(true)} />
+      </Suspense>
     </div>
+  );
+}
+
+function useIsActive() {
+  const pathname = usePathname();
+  const sp = useSearchParams();
+  return (href: string) => {
+    const [path, q] = href.split("?");
+    if (path === "/") return pathname === "/";
+    if (!(pathname === path || pathname.startsWith(path + "/"))) return false;
+    if (q) for (const [k, v] of new URLSearchParams(q)) if (sp.get(k) !== v) return false;
+    return true;
+  };
+}
+
+function NavList({ groups, sections }: { groups: { title: string; items: NavItem[] }[]; sections: { id: string; slug: string; name: string }[] }) {
+  const auth = useAuth();
+  const active = useIsActive();
+  return (
+    <nav className="flex-1 overflow-y-auto px-3 pb-6">
+      {groups.map((g) => {
+        const items = g.items.filter((i) => !i.need || auth.can(i.need));
+        if (!items.length) return null;
+        return (
+          <div key={g.title} className="mt-4">
+            <p className="px-2 pb-1 text-[11px] font-semibold text-ink-400">{g.title}</p>
+            {items.map((i) => (
+              <Link
+                key={i.href}
+                href={i.href}
+                className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition", active(i.href) ? "bg-brand-50 text-brand-700" : "text-ink-700 hover:bg-ink-100")}
+              >
+                {i.icon}
+                <span className="flex-1 truncate">{i.label}</span>
+                {i.badge ? <Badge tone="amber">{i.badge}</Badge> : null}
+              </Link>
+            ))}
+            {g.title === "Files and data" && sections.length > 0 && (
+              <div className="ml-4 mt-1 border-l border-ink-200 pl-2.5">
+                {sections.map((d) => (
+                  <Link
+                    key={d.id}
+                    href={`/sections/${d.slug}`}
+                    className={clsx("flex items-center gap-2 truncate rounded-md px-2 py-1 text-[13px]", active(`/sections/${d.slug}`) ? "bg-brand-50 font-medium text-brand-700" : "text-ink-600 hover:bg-ink-100")}
+                  >
+                    <Database className="h-3.5 w-3.5 shrink-0 text-ink-400" />
+                    <span className="truncate">{d.name}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+function BottomBar({ items, onMore }: { items: { href: string; label: string; icon: ReactNode }[]; onMore: () => void }) {
+  const active = useIsActive();
+  return (
+    <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
+      {items.map((i) => (
+        <Link key={i.href} href={i.href} className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", active(i.href) ? "text-brand-700" : "text-ink-500")}>
+          {i.icon}
+          {i.label}
+        </Link>
+      ))}
+      <button type="button" onClick={onMore} className="flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium text-ink-500">
+        <Menu className="h-5 w-5" />
+        More
+      </button>
+    </nav>
   );
 }

@@ -42,7 +42,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
   return (
     <UiCtx.Provider value={api}>
       {children}
-      <div className="no-print pointer-events-none fixed bottom-4 right-4 z-[100] flex w-[min(92vw,380px)] flex-col gap-2">
+      <div className="no-print pointer-events-none fixed bottom-20 right-1/2 z-[100] flex w-[min(92vw,380px)] translate-x-1/2 flex-col gap-2 lg:bottom-4 lg:right-4 lg:translate-x-0">
         {toasts.map((t) => (
           <div
             key={t.id}

@@ -6,8 +6,9 @@ import { useState } from "react";
 import { KeyRound, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { db, useTable } from "@/lib/data/store";
-import { ROLE_HELP, ROLE_LABELS } from "@/lib/permissions";
+import { ROLE_HELP, ROLE_LABELS, ROLE_MATRIX } from "@/lib/permissions";
 import { formatDateDisplay } from "@/lib/parse/normalize";
+import { Check, Minus } from "lucide-react";
 import type { Profile, Role } from "@/lib/types";
 import { Badge, Button, EmptyState, Field, Modal, PageHeader, Spinner, useUi } from "@/components/ui";
 
@@ -17,6 +18,7 @@ export default function UsersPage() {
   const auth = useAuth();
   const { toast, confirm } = useUi();
   const profiles = useTable("profiles");
+  const audit = useTable("audit_log");
   const [adding, setAdding] = useState(false);
   const [resetFor, setResetFor] = useState<Profile | null>(null);
 
@@ -57,6 +59,8 @@ export default function UsersPage() {
     }
   };
 
+  const lastSeen = new Map<string, string>();
+  for (const a of audit.rows) if (a.user_email && (!lastSeen.get(a.user_email) || a.at > lastSeen.get(a.user_email)!)) lastSeen.set(a.user_email, a.at);
   const rows = [...profiles.rows].sort((a, b) => Number(a.active) - Number(b.active) || (a.email ?? "").localeCompare(b.email ?? ""));
   const waiting = rows.filter((r) => !r.active).length;
 
@@ -74,7 +78,7 @@ export default function UsersPage() {
         }
       />
       {auth.mode === "local" && <p className="card p-4 text-sm text-ink-600">Demo mode has one built-in admin and no sign-in. Connect Supabase to add real users.</p>}
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
         {ROLES.map((r) => (
           <div key={r} className="card p-3">
             <p className="text-sm font-semibold">{ROLE_LABELS[r]}</p>
@@ -94,6 +98,7 @@ export default function UsersPage() {
                 <th className="th">Email</th>
                 <th className="th">Role</th>
                 <th className="th">Active</th>
+                <th className="th">Last action</th>
                 <th className="th">Joined</th>
                 <th className="th w-24" />
               </tr>
@@ -113,6 +118,7 @@ export default function UsersPage() {
                     <td className="td">
                       <input type="checkbox" checked={p.active} disabled={me} onChange={(e) => patch(p, { active: e.target.checked })} aria-label={`${p.email} is active`} />
                     </td>
+                    <td className="td text-ink-500">{p.email && lastSeen.get(p.email) ? formatDateDisplay(lastSeen.get(p.email)!.slice(0, 10)) : "-"}</td>
                     <td className="td text-ink-500">{formatDateDisplay(p.created_at.slice(0, 10))}</td>
                     <td className="td text-right">
                       {!me && auth.mode === "supabase" && (
@@ -129,6 +135,30 @@ export default function UsersPage() {
           </table>
         </div>
       )}
+      <div className="card overflow-x-auto">
+        <table className="w-full border-separate border-spacing-0 text-sm">
+          <thead>
+            <tr>
+              <th className="th">What each role can do</th>
+              {ROLES.map((r) => (
+                <th key={r} className="th text-center">{ROLE_LABELS[r]}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {ROLE_MATRIX.map((m) => (
+              <tr key={m.what}>
+                <td className="td">{m.what}</td>
+                {ROLES.map((r) => (
+                  <td key={r} className="td text-center">
+                    {m[r] ? <Check className="mx-auto h-4 w-4 text-green-600" aria-label="Yes" /> : <Minus className="mx-auto h-4 w-4 text-ink-300" aria-label="No" />}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       {adding && <AddUserModal onClose={() => setAdding(false)} call={call} />}
       {resetFor && <ResetModal user={resetFor} onClose={() => setResetFor(null)} call={call} />}
     </div>
@@ -156,7 +186,7 @@ function AddUserModal({ onClose, call }: { onClose: () => void; call: Call }) {
   };
   return (
     <Modal title="Add a user" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" busy={busy} onClick={save}>Add user</Button></>}>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field label="Name"><input className="input" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} autoFocus /></Field>
         <Field label="Role">
           <select className="input" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as Role })}>

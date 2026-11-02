@@ -3,14 +3,15 @@
 // Settings and backup: download everything, restore from a backup, export any table.
 
 import { useEffect, useRef, useState } from "react";
-import { Download, Upload } from "lucide-react";
+import { Download, FileArchive, Lock, Upload } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import { db, useTable } from "@/lib/data/store";
-import { useStockSince } from "@/lib/data/useStock";
+import { db, getFileUrl, useTable } from "@/lib/data/store";
+import { useDataLocked, useStockSince } from "@/lib/data/useStock";
+import { buildBackupZip } from "@/lib/backupZip";
 import { downloadBlob, exportTable } from "@/lib/export";
 import { formatNumber, todayYmd } from "@/lib/parse/normalize";
 import type { TableMap, TableName } from "@/lib/types";
-import { Button, EmptyState, PageHeader, useUi } from "@/components/ui";
+import { Badge, Button, EmptyState, PageHeader, useUi } from "@/components/ui";
 
 // parents first, so references exist when children are restored
 const BACKUP_TABLES = ["products", "product_aliases", "import_batches", "datasets", "stock_movements", "dataset_rows", "shipments", "shipment_files"] as const satisfies readonly TableName[];
@@ -45,6 +46,8 @@ export default function SettingsPage() {
   const input = useRef<HTMLInputElement>(null);
   const since = useStockSince();
   const settingsRows = useTable("settings").rows;
+  const locked = useDataLocked();
+  const [includeFiles, setIncludeFiles] = useState(false);
   const [sinceDraft, setSinceDraft] = useState("");
   useEffect(() => setSinceDraft(since ?? ""), [since]);
 
@@ -78,6 +81,51 @@ export default function SettingsPage() {
     downloadBlob(new Blob([JSON.stringify(data)], { type: "application/json" }), `fourbrothers-backup-${todayYmd()}.json`);
     void db.audit("backup", undefined, "Full backup downloaded");
     toast("success", "Backup downloaded. Photos and files are not inside it: they stay in storage.");
+  };
+
+  const saveLock = async (on: boolean) => {
+    try {
+      await db.upsert("settings", [{ key: "lock_data", value: on }], "key");
+      await db.audit("setting", "settings", on ? "Imported data locked" : "Imported data unlocked for editing");
+      toast("success", on ? "Imported data is locked." : "Imported data can now be edited. Switch the lock back on when you are done.");
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Could not save. Only an admin can change this.");
+    }
+  };
+
+  const zipBackup = async () => {
+    setBusy("zip");
+    try {
+      const tables: Record<string, Record<string, unknown>[]> = {};
+      for (const k of BACKUP_TABLES) tables[k] = t[k].rows as unknown as Record<string, unknown>[];
+      const blob = await buildBackupZip(
+        {
+          tables,
+          settings: settingsRows,
+          datasets: t.datasets.rows,
+          datasetRows: t.dataset_rows.rows,
+          products: t.products.rows,
+          movements: t.stock_movements.rows,
+          shipments: t.shipments.rows,
+          shipmentFiles: t.shipment_files.rows,
+          includeFiles,
+          progress: setProgress,
+          fetchFile: async (path) => {
+            const r = await fetch(await getFileUrl(path));
+            return r.ok ? new Uint8Array(await r.arrayBuffer()) : null;
+          },
+        },
+        todayYmd(),
+      );
+      downloadBlob(blob, `fourbrothers-full-backup-${todayYmd()}.zip`);
+      void db.audit("backup", undefined, `Full ZIP backup downloaded${includeFiles ? " with shipment files" : ""}`);
+      toast("success", "ZIP downloaded: the data as one backup file plus a spreadsheet for every table and section.");
+    } catch (e) {
+      toast("error", e instanceof Error ? e.message : "Could not make the ZIP.");
+    } finally {
+      setBusy(null);
+      setProgress("");
+    }
   };
 
   const restore = async (file: File) => {
@@ -135,11 +183,34 @@ export default function SettingsPage() {
       </section>
 
       <section className="card p-5">
+        <h2 className="flex items-center gap-2 font-semibold"><Lock className="h-4 w-4" /> Protect imported data</h2>
+        <p className="mt-1 text-sm text-ink-600">
+          When locked (recommended), stock items, the sales register, receipts and sections cannot be edited or deleted, only added to by hand. Shipments always stay editable. To correct a stock figure use a stock count, which keeps the history.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Badge tone={locked ? "green" : "amber"}>{locked ? "Locked" : "Unlocked: editing is allowed"}</Badge>
+          {auth.can("admin") ? (
+            <Button onClick={() => saveLock(!locked)}>{locked ? "Unlock for editing" : "Lock again"}</Button>
+          ) : (
+            <span className="text-sm text-ink-500">Only an admin can change this.</span>
+          )}
+        </div>
+      </section>
+
+      <section className="card p-5">
         <h2 className="font-semibold">Full backup</h2>
-        <p className="mt-1 text-sm text-ink-600">One file with stock items, linked names, stock lines, sections, shipments and import history.</p>
+        <p className="mt-1 text-sm text-ink-600">
+          The ZIP holds everything: one backup file, a spreadsheet for every table (sales register, receipts, stock items, shipments and more) and every section as its own spreadsheet. The JSON file alone is what Restore reads.
+        </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <Button variant="primary" onClick={backup}>
-            <Download className="h-4 w-4" /> Download backup
+          <Button variant="primary" busy={busy === "zip"} onClick={zipBackup}>
+            <FileArchive className="h-4 w-4" /> Download everything (ZIP)
+          </Button>
+          <label className="flex cursor-pointer items-center gap-1.5 text-sm text-ink-700">
+            <input type="checkbox" checked={includeFiles} onChange={(e) => setIncludeFiles(e.target.checked)} /> include shipment photos and files
+          </label>
+          <Button onClick={backup}>
+            <Download className="h-4 w-4" /> Backup file only (JSON)
           </Button>
           {auth.can("admin") && (
             <>

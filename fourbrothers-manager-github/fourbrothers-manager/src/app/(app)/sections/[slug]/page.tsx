@@ -5,9 +5,10 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { Columns3, FileUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { Columns3, FileUp, Lock, Pencil, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { db, useTable } from "@/lib/data/store";
+import { useDataLocked } from "@/lib/data/useStock";
 import { makeColumnKey, todayYmd } from "@/lib/parse/normalize";
 import type { ColumnDef, ColumnType, Dataset } from "@/lib/types";
 import { DataGrid, type GridColumn } from "@/components/DataGrid";
@@ -26,6 +27,7 @@ export default function SectionPage() {
   const [adding, setAdding] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
+  const locked = useDataLocked();
 
   const dataset = datasets.rows.find((d) => d.slug === slug);
   const rows: Row[] = useMemo(() => (dataset ? allRows.rows.filter((r) => r.dataset_id === dataset.id).map((r) => ({ id: r.id, data: r.data })) : []), [allRows.rows, dataset]);
@@ -46,7 +48,7 @@ export default function SectionPage() {
     label: c.label,
     type: c.type === "datetime" ? "text" : c.type,
     options: c.options,
-    editable: true,
+    editable: !locked,
     hidden: c.hidden,
     width: c.width,
     get: (r) => r.data[c.key],
@@ -101,6 +103,11 @@ export default function SectionPage() {
           </>
         }
       />
+      {locked && (
+        <p className="flex items-center gap-1.5 text-xs text-ink-500">
+          <Lock className="h-3.5 w-3.5" /> Rows in this section are locked and cannot be edited. You can still add new rows by hand. {auth.can("admin") && <Link className="text-brand-700 underline" href="/settings">Lock settings</Link>}
+        </p>
+      )}
       <DataGrid
         key={dataset.id}
         id={`section:${dataset.id}`}
@@ -109,8 +116,8 @@ export default function SectionPage() {
         rowId={(r) => r.id}
         columns={columns}
         loading={!allRows.loaded}
-        canEdit={canWrite}
-        canDelete={canManage}
+        canEdit={canWrite && !locked}
+        canDelete={canManage && !locked}
         initialSearch={query}
         onAdd={canWrite ? () => setAdding(true) : undefined}
         addLabel="Add row"
@@ -150,6 +157,7 @@ function AddRowModal({ dataset, onClose }: { dataset: Dataset; onClose: () => vo
     setBusy(true);
     try {
       await db.insert("dataset_rows", [{ dataset_id: dataset.id, data }]);
+      await db.audit("add row", "dataset_rows", `1 row added to ${dataset.name}`, dataset.id);
       toast("success", "Row added.");
       onClose();
     } catch (e) {
@@ -159,7 +167,7 @@ function AddRowModal({ dataset, onClose }: { dataset: Dataset; onClose: () => vo
   };
   return (
     <Modal title={`Add a row to ${dataset.name}`} size="lg" onClose={onClose} footer={<><Button onClick={onClose}>Cancel</Button><Button variant="primary" busy={busy} onClick={save}>Add row</Button></>}>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {dataset.columns.map((c, i) => (
           <Field key={c.key} label={c.label}>
             {c.options?.length ? (

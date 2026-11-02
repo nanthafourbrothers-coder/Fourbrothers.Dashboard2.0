@@ -15,8 +15,9 @@ export interface StockRow extends Product {
 }
 
 /** `since`: lines dated before this day are kept but not counted, because opening stock is the count on that day. */
-export function computeStock(products: Product[], movements: Movement[], opts: { since?: string | null } = {}): StockRow[] {
+export function computeStock(products: Product[], movements: Movement[], opts: { since?: string | null; lowLimit?: number } = {}): StockRow[] {
   const since = opts.since || null;
+  const lowLimit = Number(opts.lowLimit) || 0; // stock under this many units counts as low, unless the item has its own reorder level
   const sums = new Map<string, { in: number; out: number; adj: number; counted: number; last: string | null; lastOut: string | null }>();
   for (const m of movements) {
     if (!m.product_id) continue;
@@ -45,7 +46,7 @@ export function computeStock(products: Product[], movements: Movement[], opts: {
     if (!s?.counted && opening === 0) flag = "uncounted";
     else if (onHand < 0) flag = "negative";
     else if (onHand === 0) flag = "out";
-    else if (reorder > 0 && onHand <= reorder) flag = "low";
+    else if (reorder > 0 ? onHand <= reorder : lowLimit > 0 && onHand < lowLimit) flag = "low";
     return {
       ...p,
       in_qty: s?.in ?? 0,

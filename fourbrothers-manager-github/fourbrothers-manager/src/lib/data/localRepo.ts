@@ -138,9 +138,19 @@ function withDefaults(t: TableName, row: Record<string, unknown>): Record<string
 export function createLocalRepo(): Repo {
   const channel = typeof BroadcastChannel !== "undefined" ? new BroadcastChannel("fb-manager-local") : null;
   const listeners = new Map<TableName, Set<() => void>>();
+  // many quick writes (for example linking hundreds of names) refresh the screen once, not once per write
+  const timers = new Map<TableName, ReturnType<typeof setTimeout>>();
   const emit = (t: TableName) => {
-    listeners.get(t)?.forEach((cb) => cb());
-    channel?.postMessage({ table: t });
+    const old = timers.get(t);
+    if (old) clearTimeout(old);
+    timers.set(
+      t,
+      setTimeout(() => {
+        timers.delete(t);
+        listeners.get(t)?.forEach((cb) => cb());
+        channel?.postMessage({ table: t });
+      }, 150),
+    );
   };
   channel?.addEventListener("message", (e: MessageEvent<{ table: TableName }>) => listeners.get(e.data.table)?.forEach((cb) => cb()));
 
