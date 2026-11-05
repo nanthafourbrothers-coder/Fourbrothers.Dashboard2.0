@@ -10,16 +10,18 @@ import { useAuth } from "@/lib/auth";
 import { useStockSince } from "@/lib/data/useStock";
 import { analyseProduct, filterOptions, hasAnyFilter, hasSalesFilter, NO_FILTERS, otherProductsAt, resolvePeriod, type Filters, type PeriodState } from "@/lib/analysis";
 import { exportTable } from "@/lib/export";
+import { explainProduct, productFlow } from "@/lib/overview";
 import { formatDateDisplay, formatNumber, todayYmd } from "@/lib/parse/normalize";
 import type { StockRow } from "@/lib/stock";
 import type { Movement } from "@/lib/types";
 import { Badge, Button, Field, Modal, Popover, useUi } from "./ui";
-import { HBars, InOutChart } from "./charts";
+import { Donut, HBars, InOutChart } from "./charts";
+import { MeaningCard, SoldLeftBar, StockEquation, SupplyFlow } from "./ProductDiagrams";
 import { PeriodPicker } from "./PeriodPicker";
 
 type Tab = "overview" | "parties" | "places" | "lines" | "count";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "overview", label: "Charts" },
+  { id: "overview", label: "Overview" },
   { id: "parties", label: "Customers / parties" },
   { id: "places", label: "Locations" },
   { id: "lines", label: "All lines" },
@@ -108,13 +110,8 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
     }
   };
 
-  const cards: [string, number, string?][] = [
-    ["Opening", a.kpis.opening],
-    ["In (purchases)", a.kpis.in, "text-green-700"],
-    ["Out (sales)", a.kpis.out, "text-red-600"],
-    ["Adjusted", a.kpis.adjust],
-    ["On hand", a.kpis.onHand, a.kpis.onHand < 0 ? "text-red-700" : ""],
-  ];
+  const meaning = useMemo(() => explainProduct(item, a, period.label), [item, a, period.label]);
+  const flow = useMemo(() => productFlow(a, { salesFiltered: salesOn }), [a, salesOn]);
   const shareText = salesOn && a.periodOut ? `${((a.lines.filter((m) => m.type === "OUT").reduce((s, m) => s + Number(m.qty), 0) / a.periodOut) * 100).toFixed(0)}% of all sales in this period` : "";
   const selectedOut = a.lines.filter((m) => m.type === "OUT").reduce((s, m) => s + (Number(m.qty) || 0), 0);
 
@@ -159,14 +156,7 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
           <p className="mt-2 hidden text-xs text-ink-500 sm:block">Showing {period.label}.</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
-          {cards.map(([l, v, cls]) => (
-            <div key={l} className="rounded-lg border border-ink-200 px-3 py-2">
-              <p className="text-xs text-ink-500">{l}</p>
-              <p className={`text-xl font-semibold tabular-nums ${cls ?? ""}`}>{formatNumber(v)}</p>
-            </div>
-          ))}
-        </div>
+        <StockEquation kpis={a.kpis} />
         {salesOn && (
           <p className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
             Looking only at the sales you filtered: <b>{formatNumber(selectedOut)}</b> sold{shareText ? ` (${shareText})` : ""}. Opening, in and on hand above are for the whole item, because stock is held in the godown, not in a customer&apos;s city.
@@ -182,19 +172,29 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
         </div>
 
         {tab === "overview" && (
-          <div className="space-y-5">
-            <div>
-              <p className="mb-1 text-sm font-semibold">Stock in, out and on hand ({a.grain === "day" ? "per day" : a.grain === "week" ? "per week" : "per month"})</p>
+          <div className="space-y-6">
+            <MeaningCard meaning={meaning} />
+
+            <Block title="How much is sold, how much is left" hint="Everything that was available in this view, split into sold and left.">
+              <SoldLeftBar kpis={a.kpis} />
+            </Block>
+
+            <Block title="Where it came from and where it went" hint={salesOn ? "Sales are narrowed by your filters. The rest of the sales shows as other places." : "Left side: what filled the stock. Right side: where it was sold and what is left. Thicker lines mean more pieces."}>
+              <SupplyFlow flow={flow} name={item.name} />
+            </Block>
+
+            <Block title={`Stock in, out and on hand ${a.grain === "day" ? "per day" : a.grain === "week" ? "per week" : "per month"}`} hint="Green and red bars are pieces bought and sold. The blue line is the stock left after each date.">
               <InOutChart data={a.series} />
-            </div>
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-              <Block title="Sold by state">
-                <HBars rows={a.byState} onPick={toggle("states")} picked={filters.states} empty="No sales in this selection." />
+            </Block>
+
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+              <Block title="Sold by state" hint="Click a name to filter this item to that state.">
+                <Donut rows={a.byState} centerBottom="sold" onPick={toggle("states")} picked={filters.states} empty="No sales in this selection." />
               </Block>
-              <Block title="Sold by channel">
-                <HBars rows={a.byChannel} onPick={toggle("channels")} picked={filters.channels} empty="No sales in this selection." />
+              <Block title="Sold by channel" hint="Click a name to filter.">
+                <Donut rows={a.byChannel} centerBottom="sold" onPick={toggle("channels")} picked={filters.channels} empty="No sales in this selection." />
               </Block>
-              <Block title="Top customers">
+              <Block title="Top customers" hint="Click a name to filter.">
                 <HBars rows={a.parties.slice(0, 8).map((p) => ({ label: p.party, qty: p.qty, sub: `${p.invoices} invoice${p.invoices === 1 ? "" : "s"}${p.city ? ` | ${p.city}` : ""}` }))} onPick={toggle("parties")} picked={filters.parties} empty="No sales in this selection." />
               </Block>
             </div>
@@ -408,12 +408,14 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
   );
 }
 
-function Block({ title, children }: { title: string; children: React.ReactNode }) {
+function Block({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div>
-      <p className="mb-1.5 text-sm font-semibold text-ink-900">{title}</p>
+    <section className="min-w-0">
+      <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
+      {hint && <p className="mb-2 text-xs text-ink-500">{hint}</p>}
+      {!hint && <div className="mb-1.5" />}
       {children}
-    </div>
+    </section>
   );
 }
 

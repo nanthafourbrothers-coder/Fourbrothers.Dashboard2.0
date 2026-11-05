@@ -9,6 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test:parsers": "tsx tests/parsers.test.ts",
+    "test:overview": "tsx tests/overview.test.ts",
     "test:e2e": "node tests/e2e-full.mjs"
   },
   "dependencies": {

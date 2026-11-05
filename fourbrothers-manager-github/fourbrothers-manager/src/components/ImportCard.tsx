@@ -15,9 +15,11 @@ import {
 } from "@/lib/importPlan";
 import { commitDataset, commitMovements, commitShipments, commitStockItems, undoBatch } from "@/lib/importCommit";
 import { NameResolver } from "@/lib/stock";
+import { overviewOfLines, pipeForBatch, type FileOverview } from "@/lib/overview";
 import type { ImportBatch } from "@/lib/types";
 import { Badge, Button, Field, useUi } from "./ui";
 import { PreviewTable, type PreviewColumn } from "./PreviewTable";
+import { FileOverviewCard, FlowRow } from "./UploadOverview";
 
 const DEST_INFO: Record<Destination, { label: string; help: string; icon: React.ReactNode }> = {
   movements: { label: "Stock in and out", help: "Adds lines to the stock ledger", icon: <ArrowLeftRight className="h-4 w-4" /> },
@@ -68,7 +70,7 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
   const [dedupeOn, setDedupeOn] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
-  const [result, setResult] = useState<{ batch: ImportBatch; text: string; link?: { href: string; label: string }; unmapped?: number } | null>(null);
+  const [result, setResult] = useState<{ batch: ImportBatch; text: string; link?: { href: string; label: string }; unmapped?: number; overview?: FileOverview; direction?: "IN" | "OUT" | "BOTH" } | null>(null);
   const [showIssues, setShowIssues] = useState(false);
 
   const allowed = allowedDestinations(table);
@@ -81,6 +83,9 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
   const movementRows: ParsedRow[] = useMemo(() => (isMovementReady(table) ? table.rows : applyMapping(table, moveMap, MOVEMENT_FIELDS)), [table, moveMap]);
   const drafts = useMemo(() => (dest === "movements" ? buildMovementDrafts(movementRows, direction, fallback) : []), [dest, movementRows, direction, fallback]);
   const mPlan = useMemo(() => (dest === "movements" ? planMovements(drafts, movements, resolver, { replaceChanged }) : null), [dest, drafts, movements, resolver, replaceChanged]);
+  // a picture of what the file will add, so it can be checked before saving
+  const fileOverview = useMemo(() => (mPlan ? overviewOfLines(mPlan.inserts) : null), [mPlan]);
+  const flowDirection: "IN" | "OUT" | "BOTH" = direction === "auto" ? "BOTH" : direction;
 
   // ------------------------------------------------ stock items plan
   const stockRows: ParsedRow[] = useMemo(() => (isStockReady(table) ? table.rows : applyMapping(table, stockMap, STOCK_ITEM_FIELDS)), [table, stockMap]);
@@ -123,6 +128,8 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
           text: `${formatNumber(batch.inserted)} stock lines saved (${formatNumber(mPlan.totalQty)} units). ${mPlan.duplicates ? `${mPlan.duplicates} already saved lines were skipped. ` : ""}${mPlan.invalid ? `${mPlan.invalid} lines with problems were not saved.` : ""}`,
           link: { href: "/movements", label: "Open stock in and out" },
           unmapped: mPlan.unmapped,
+          overview: overviewOfLines(mPlan.inserts),
+          direction: flowDirection,
         });
       } else if (dest === "stock_items" && sPlan) {
         if (qtyMode === "opening" && movements.length > 0 && !(await confirm("Stock movements already exist. Setting opening stock from this file changes the stock on hand of every item in it. Continue?", { danger: true, confirmLabel: "Set opening stock" }))) return;
@@ -285,12 +292,19 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
               </Link>
             </p>
           )}
+          <ul>
+            <FlowRow pipe={pipeForBatch(result.batch)} />
+          </ul>
+          {result.overview && <FileOverviewCard overview={result.overview} direction={result.direction} heading="What this file added" />}
           <div className="flex flex-wrap gap-2">
             {result.link && (
               <Link href={result.link.href} className="btn btn-primary">
                 {result.link.label}
               </Link>
             )}
+            <Link href="/" className="btn">
+              See the dashboard overview
+            </Link>
             {canManage && (
               <Button onClick={undo}>
                 <Undo2 className="h-4 w-4" /> Undo this import
@@ -359,6 +373,11 @@ export function ImportCard({ initial, onRemove }: { initial: ParsedTable; onRemo
                   <Tile label="Already saved (skipped)" value={`${formatNumber(mPlan.duplicates)} lines`} sub={`${formatNumber(check.dup)} units`} />
                   <Tile label="Need a fix" value={`${formatNumber(mPlan.invalid)} lines`} sub={mPlan.invalid ? "Correct in the table below or they are skipped" : "None"} tone={mPlan.invalid ? "red" : undefined} />
                   <Tile label="Names not linked yet" value={`${formatNumber(mPlan.unmapped)} lines`} sub={mPlan.unmapped ? "Link them after saving" : "All linked"} tone={mPlan.unmapped ? "amber" : undefined} />
+                  {fileOverview && fileOverview.lines > 0 && (
+                    <div className="col-span-full">
+                      <FileOverviewCard overview={fileOverview} direction={flowDirection} heading="What will be saved from this file" />
+                    </div>
+                  )}
                   <p className="col-span-full text-xs text-ink-500">
                     Check: file total {formatNumber(check.file)} units = saved {formatNumber(check.save)} + already saved {formatNumber(check.dup)} + need a fix {formatNumber(check.bad)}
                     {check.changed ? ` + changed vouchers ${formatNumber(check.changed)}` : ""}

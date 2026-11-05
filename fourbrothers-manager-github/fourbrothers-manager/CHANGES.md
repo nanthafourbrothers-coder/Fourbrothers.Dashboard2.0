@@ -1,3 +1,27 @@
+# Overview pictures (charts and diagrams for every upload)
+
+**Not touched:** Supabase login, the database, your keys. No SQL to run. Same upload steps as before.
+
+## New files (add)
+| File | What it is |
+| --- | --- |
+| `src/lib/overview.ts` | The numbers behind the pictures: plain-words summary of a product, came-from / went-to flow, what is inside a file, every uploaded file as one flow |
+| `src/components/ProductDiagrams.tsx` | Product popup: Opening + In - Out = On hand cards, sold/left bar, plain-words box, flow diagram (wide screens) / top-to-bottom flow (phones) |
+| `src/components/UploadOverview.tsx` | Dashboard "Your uploaded files at a glance", plus the "what is in this file" card and file -> result -> screen row used on the import page |
+| `tests/overview.test.ts` | Checks the above with made-up data (`npm run test:overview`) |
+
+## Changed files (replace)
+| File | Change |
+| --- | --- |
+| `src/components/charts.tsx` | Charts redraw to the real screen width (readable on phones), stock-on-hand panel under the in/out bars, tap a date to read it, new ring chart |
+| `src/components/StockItemModal.tsx` | Product popup "Overview" tab: summary, sold/left bar, flow diagram, chart, rings by state and channel |
+| `src/app/(app)/page.tsx` | Dashboard: uploaded files overview, rings for channel and state, period buttons no longer push the page wider than a phone |
+| `src/components/ImportCard.tsx` | Shows what a file will add before saving, and a flow + overview after saving |
+| `src/components/ui.tsx` | Header buttons can no longer overflow a phone screen |
+| `package.json` | `test:overview` script |
+
+---
+
 # Dashboard 2.0 - what changed
 
 Upload these files to GitHub with the same folder paths (replace the old ones). Vercel rebuilds by itself.

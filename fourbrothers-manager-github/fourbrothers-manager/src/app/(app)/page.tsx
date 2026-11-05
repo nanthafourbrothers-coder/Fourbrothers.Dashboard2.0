@@ -11,6 +11,8 @@ import { useStockRows } from "@/lib/data/useStock";
 import { addDaysYmd, aliasKey, formatDateDisplay, formatNumber, todayYmd } from "@/lib/parse/normalize";
 import type { Movement } from "@/lib/types";
 import { LowStockAlert } from "@/components/LowStockAlert";
+import { Donut, InOutChart, type Slice } from "@/components/charts";
+import { UploadOverview } from "@/components/UploadOverview";
 import { Badge, EmptyState, Field, PageHeader, Spinner, Stat, useLocalPref } from "@/components/ui";
 
 type Range = "7" | "30" | "90" | "365" | "all" | "custom";
@@ -142,10 +144,10 @@ export default function DashboardPage() {
         title={`Hello${auth.profile?.full_name ? ", " + auth.profile.full_name.split(" ")[0] : ""}`}
         subtitle="Stock position and movement for fourbrothers.in and your other sales channels."
         actions={
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex rounded-lg border border-ink-200 bg-white p-0.5 text-sm">
+          <div className="flex max-w-full flex-wrap items-end gap-2">
+            <div className="scroll-thin flex max-w-full overflow-x-auto rounded-lg border border-ink-200 bg-white p-0.5 text-sm">
               {RANGES.map((r) => (
-                <button key={r.id} onClick={() => setRange(r.id)} className={`rounded-md px-2.5 py-1 ${range === r.id ? "bg-brand-600 text-white" : "text-ink-700 hover:bg-ink-100"}`}>
+                <button key={r.id} onClick={() => setRange(r.id)} className={`whitespace-nowrap rounded-md px-2.5 py-1 ${range === r.id ? "bg-brand-600 text-white" : "text-ink-700 hover:bg-ink-100"}`}>
                   {r.label}
                 </button>
               ))}
@@ -218,19 +220,14 @@ export default function DashboardPage() {
             </div>
           )}
 
+          <UploadOverview />
+
           <div className="card p-4">
-            <div className="mb-2 flex items-center justify-between">
+            <div className="mb-2">
               <h2 className="text-sm font-semibold text-ink-900">Stock in and out ({chart.mode === "day" ? "per day" : chart.mode === "week" ? "per week" : "per month"})</h2>
-              <div className="flex items-center gap-3 text-xs text-ink-600">
-                <span className="flex items-center gap-1">
-                  <i className="inline-block h-2.5 w-2.5 rounded-sm bg-green-600" /> In
-                </span>
-                <span className="flex items-center gap-1">
-                  <i className="inline-block h-2.5 w-2.5 rounded-sm bg-brand-600" /> Out
-                </span>
-              </div>
+              <p className="text-xs text-ink-500">Green bars are pieces that came in, red bars are pieces that went out.</p>
             </div>
-            {chart.data.length ? <BarChart data={chart.data} /> : <p className="py-10 text-center text-sm text-ink-500">No stock movement in this period.</p>}
+            <InOutChart data={chart.data} showStock={false} />
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -238,10 +235,10 @@ export default function DashboardPage() {
               <Bars rows={breakdowns.items} />
             </Panel>
             <Panel title="Sales by channel (period)">
-              <Bars rows={breakdowns.channels} />
+              <Donut rows={toSlices(breakdowns.channels)} centerBottom="sold" empty="No sales in this period." />
             </Panel>
             <Panel title="Sales by state (period)">
-              <Bars rows={breakdowns.states} />
+              <Donut rows={toSlices(breakdowns.states)} centerBottom="sold" empty="No sales in this period." />
             </Panel>
           </div>
 
@@ -307,50 +304,6 @@ function Bars({ rows, empty = "No sales in this period." }: { rows: [string, num
   );
 }
 
-function BarChart({ data }: { data: { label: string; in: number; out: number }[] }) {
-  const W = 900;
-  const H = 240;
-  const pad = { l: 44, r: 8, t: 8, b: 26 };
-  const max = niceMax(Math.max(...data.flatMap((d) => [d.in, d.out]), 1));
-  const iw = W - pad.l - pad.r;
-  const ih = H - pad.t - pad.b;
-  const slot = iw / data.length;
-  const bw = Math.min(22, Math.max(2, (slot - 4) / 2));
-  const y = (v: number) => pad.t + ih - (v / max) * ih;
-  const ticks = [0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(max * t));
-  const every = Math.max(1, Math.ceil(data.length / 12));
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Bar chart of stock in and stock out">
-      {ticks.map((t) => (
-        <g key={t}>
-          <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#e7e7ea" strokeWidth={1} />
-          <text x={pad.l - 6} y={y(t) + 3} textAnchor="end" fontSize={10} fill="#71717a">
-            {formatNumber(t)}
-          </text>
-        </g>
-      ))}
-      {data.map((d, i) => {
-        const cx = pad.l + slot * i + slot / 2;
-        return (
-          <g key={i}>
-            <title>{`${d.label}: in ${formatNumber(d.in)}, out ${formatNumber(d.out)}`}</title>
-            <rect x={cx - bw - 1} y={y(d.in)} width={bw} height={Math.max(0, pad.t + ih - y(d.in))} rx={2} fill="#16a34a" />
-            <rect x={cx + 1} y={y(d.out)} width={bw} height={Math.max(0, pad.t + ih - y(d.out))} rx={2} fill="#D31B25" />
-            {i % every === 0 && (
-              <text x={cx} y={H - 8} textAnchor="middle" fontSize={10} fill="#71717a">
-                {d.label}
-              </text>
-            )}
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
-
-function niceMax(v: number): number {
-  const p = Math.pow(10, Math.floor(Math.log10(v)));
-  const n = v / p;
-  const step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
-  return step * p;
+function toSlices(rows: [string, number][]): Slice[] {
+  return rows.map(([label, qty]) => ({ label, qty }));
 }
