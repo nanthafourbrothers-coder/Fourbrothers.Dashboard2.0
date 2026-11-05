@@ -41,7 +41,7 @@ export function FlowRow({ pipe }: { pipe: Pipe }) {
   const shown = pipe.files.slice(0, 3);
   const more = pipe.files.length - shown.length;
   return (
-    <li className="rounded-xl border border-ink-200 bg-white p-3 md:flex md:items-center md:gap-3">
+    <li className="rounded-2xl border border-ink-200 bg-white p-3 transition hover:border-ink-300 md:flex md:items-center md:gap-3">
       <div className="min-w-0 space-y-1.5 md:w-[34%] md:shrink-0">
         {shown.map((f, i) => (
           <div key={i} className="flex items-start gap-2">
@@ -59,9 +59,8 @@ export function FlowRow({ pipe }: { pipe: Pipe }) {
 
       <Arrow />
 
-      <div className={`min-w-0 rounded-lg border px-3 py-2 md:flex-1 ${TONE_BOX[pipe.tone]}`}>
-        <p className={`text-sm font-semibold ${TONE_TEXT[pipe.tone]}`}>{pipe.title}</p>
-        <p className="text-xs text-ink-600">{pipe.what}</p>
+      <div className={`min-w-0 rounded-xl border px-3 py-2 md:flex-1 ${TONE_BOX[pipe.tone]}`}>
+        <p className={`text-sm font-semibold ${TONE_TEXT[pipe.tone]}`} title={pipe.what}>{pipe.title}</p>
         <p className="mt-1 text-sm">
           <b className="text-lg tabular-nums text-ink-900">{formatNumber(pipe.saved)}</b> <span className="text-ink-600">saved</span>
           {pipe.skipped > 0 && (
@@ -79,7 +78,7 @@ export function FlowRow({ pipe }: { pipe: Pipe }) {
       <Arrow />
 
       <Link href={pipe.href} className="btn mt-1 w-full md:mt-0 md:w-auto md:shrink-0">
-        Open {pipe.linkLabel}
+        Open
       </Link>
     </li>
   );
@@ -98,10 +97,10 @@ function Arrow() {
 
 function Mini({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-lg border border-ink-200 bg-white px-3 py-2">
+    <div className="rounded-xl border border-ink-200 bg-ink-50/60 px-3 py-2.5">
       <p className="text-xs text-ink-500">{label}</p>
-      <p className="text-lg font-semibold tabular-nums text-ink-900">{value}</p>
-      {sub && <p className="text-xs text-ink-500">{sub}</p>}
+      <p className="text-xl font-semibold tabular-nums text-ink-900">{value}</p>
+      {sub && <p className="truncate text-xs text-ink-400">{sub}</p>}
     </div>
   );
 }
@@ -136,16 +135,16 @@ export function FileOverviewCard({ overview: o, direction, heading = "What is in
   const color = direction === "IN" ? GREEN : direction === "OUT" ? RED : BLUE;
   const dates = coverageText(o);
   return (
-    <div className="space-y-3 rounded-xl border border-ink-200 bg-ink-50/60 p-3">
+    <div className="space-y-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-card">
       <div>
         <p className="text-sm font-semibold text-ink-900">{heading}</p>
-        {dates && <p className="text-xs text-ink-500">Dates covered: {dates}.</p>}
+        {dates && <p className="text-xs text-ink-500">{dates}</p>}
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <Mini label="Stock lines" value={formatNumber(o.lines)} />
-        <Mini label="Total pieces" value={formatNumber(o.units)} />
-        <Mini label="Different items" value={formatNumber(o.items)} />
-        <Mini label="Months covered" value={formatNumber(o.months.length)} sub={o.first && o.last ? `${formatDateDisplay(o.first)} to ${formatDateDisplay(o.last)}` : undefined} />
+        <Mini label="Lines" value={formatNumber(o.lines)} />
+        <Mini label="Pieces" value={formatNumber(o.units)} />
+        <Mini label="Items" value={formatNumber(o.items)} />
+        <Mini label="Months" value={formatNumber(o.months.length)} sub={o.first && o.last ? `${formatDateDisplay(o.first)} to ${formatDateDisplay(o.last)}` : undefined} />
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {o.months.length > 1 && (
@@ -200,17 +199,14 @@ export function UploadOverview() {
   const period = o.coverage.first && o.coverage.last ? `${formatDateDisplay(o.coverage.first)} to ${formatDateDisplay(o.coverage.last)}` : "No dates yet";
 
   return (
-    <section className="card p-4" aria-labelledby="uploads-title">
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h2 id="uploads-title" className="text-base font-semibold text-ink-900">
-            Your uploaded files at a glance
-          </h2>
-          <p className="text-sm text-ink-500">Every file you upload becomes stock, sales or shipments. This shows where each one went.</p>
-        </div>
+    <section className="card p-4 sm:p-5" aria-labelledby="uploads-title">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="uploads-title" className="text-base font-semibold text-ink-900">
+          Uploaded files
+        </h2>
         <div className="flex items-center gap-2">
           <Link href="/import" className="btn btn-sm btn-primary">
-            <FileUp className="h-3.5 w-3.5" /> Upload files
+            <FileUp className="h-3.5 w-3.5" /> Upload
           </Link>
           <button type="button" className="btn btn-sm" onClick={() => setOpen(!open)} aria-expanded={open}>
             {open ? (
@@ -229,23 +225,23 @@ export function UploadOverview() {
       {open && (
         <div className="mt-4 space-y-5">
           <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
-            <Mini label="Files uploaded" value={formatNumber(o.fileCount)} />
-            <Mini label="Rows saved" value={formatNumber(o.saved)} sub={o.rows ? `of ${formatNumber(o.rows)} in the files` : undefined} />
-            <Mini label="Skipped" value={formatNumber(o.skipped)} sub="already saved or not usable" />
+            <Mini label="Files" value={formatNumber(o.fileCount)} />
+            <Mini label="Rows saved" value={formatNumber(o.saved)} sub={o.rows ? `of ${formatNumber(o.rows)}` : undefined} />
+            <Mini label="Skipped" value={formatNumber(o.skipped)} sub="duplicates or unusable" />
             <Mini label="Last upload" value={timeAgo(o.lastUpload)} />
             <div className="col-span-2 md:col-span-1">
-              <Mini label="Dates covered" value={o.coverage.months.length ? `${formatNumber(o.coverage.months.length)} month${o.coverage.months.length === 1 ? "" : "s"}` : "None"} sub={period} />
+              <Mini label="Covers" value={o.coverage.months.length ? `${formatNumber(o.coverage.months.length)} month${o.coverage.months.length === 1 ? "" : "s"}` : "None"} sub={period} />
             </div>
           </div>
 
           {o.pipes.length > 0 ? (
             <div>
               <div className="mb-2 hidden items-center gap-3 px-3 text-xs font-semibold tracking-wide text-ink-500 md:flex">
-                <span className="w-[34%] shrink-0">YOUR FILES</span>
+                <span className="w-[34%] shrink-0">FILES</span>
                 <span className="w-5" />
-                <span className="flex-1">WHAT THEY BECAME</span>
+                <span className="flex-1">SAVED AS</span>
                 <span className="w-5" />
-                <span className="w-36 shrink-0">WHERE TO SEE IT</span>
+                <span className="w-24 shrink-0" />
               </div>
               <ul className="space-y-2">
                 {o.pipes.map((p) => (
@@ -254,15 +250,12 @@ export function UploadOverview() {
               </ul>
             </div>
           ) : (
-            <p className="rounded-lg border border-dashed border-ink-300 px-4 py-6 text-center text-sm text-ink-500">
-              No uploaded files are recorded yet. Upload your Tally register, purchase book or Shopify export and this picture fills in.
-            </p>
+            <p className="rounded-xl border border-dashed border-ink-300 px-4 py-6 text-center text-sm text-ink-500">No files uploaded yet.</p>
           )}
 
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-ink-900">Which months your files cover</h3>
-              <p className="mb-2 text-xs text-ink-500">Darker means more lines. A pale box means no file has data for that month yet.</p>
+              <h3 className="mb-2 text-sm font-semibold text-ink-900">Months covered</h3>
               {o.coverage.months.length ? (
                 <div className="space-y-1">
                   {(
@@ -298,12 +291,11 @@ export function UploadOverview() {
             </div>
 
             <div className="min-w-0">
-              <h3 className="text-sm font-semibold text-ink-900">How your stock items look now</h3>
-              <p className="mb-2 text-xs text-ink-500">Every stock item counted once, by its status after all the files.</p>
+              <h3 className="mb-2 text-sm font-semibold text-ink-900">Stock status</h3>
               <Donut rows={health} centerTop={formatNumber(o.health.items)} centerBottom="items" empty="No stock items yet." />
               <div className="mt-3">
                 <div className="flex items-baseline justify-between text-xs text-ink-600">
-                  <span>Lines linked to a stock item</span>
+                  <span>Lines linked to an item</span>
                   <b className={linkedPct === 100 ? "text-green-700" : "text-amber-700"}>{linkedPct}%</b>
                 </div>
                 <div className="mt-1 h-2 rounded-full bg-ink-100">
@@ -311,15 +303,15 @@ export function UploadOverview() {
                 </div>
                 {o.health.unlinkedNames > 0 ? (
                   <p className="mt-1 text-xs text-amber-800">
-                    {formatNumber(o.health.unlinkedNames)} name{o.health.unlinkedNames === 1 ? "" : "s"} in your files {o.health.unlinkedNames === 1 ? "is" : "are"} not linked yet, so {o.health.unlinkedNames === 1 ? "it does" : "they do"} not change stock.{" "}
+                    {formatNumber(o.health.unlinkedNames)} name{o.health.unlinkedNames === 1 ? "" : "s"} not linked.{" "}
                     <Link href="/mapping" className="font-medium underline">
-                      Match names
+                      Match
                     </Link>
                   </p>
                 ) : (
                   o.health.stockLines > 0 && (
                     <p className="mt-1 flex items-center gap-1 text-xs text-green-700">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Every name in your files is linked.
+                      <CheckCircle2 className="h-3.5 w-3.5" /> All linked
                     </p>
                   )
                 )}
@@ -330,14 +322,14 @@ export function UploadOverview() {
           {o.recent.length > 0 && (
             <div>
               <h3 className="mb-2 text-sm font-semibold text-ink-900">Latest uploads</h3>
-              <ul className="divide-y divide-ink-100 rounded-xl border border-ink-200">
+              <ul className="divide-y divide-ink-100 rounded-2xl border border-ink-200">
                 {o.recent.map((f) => (
                   <li key={f.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
                     <span className="min-w-0 flex-1 basis-48 truncate font-medium" title={f.name}>
                       {f.name}
                     </span>
                     <Badge tone="brand">{f.kindLabel}</Badge>
-                    <span className="text-xs text-ink-500">to {f.destLabel}</span>
+                    <span className="text-xs text-ink-500">{f.destLabel}</span>
                     <span className="ml-auto flex items-center gap-2 text-xs tabular-nums text-ink-600">
                       <b className="text-green-700">{formatNumber(f.saved)}</b> saved
                       {f.skipped > 0 && <span className="text-ink-500">{formatNumber(f.skipped)} skipped</span>}

@@ -128,10 +128,10 @@ export function Spinner({ label }: { label?: string }) {
 
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: ReactNode; actions?: ReactNode }) {
   return (
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+    <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
       <div className="min-w-0">
-        <h1 className="text-xl font-semibold tracking-tight text-ink-900">{title}</h1>
-        {subtitle && <p className="mt-0.5 max-w-3xl text-sm text-ink-500">{subtitle}</p>}
+        <h1 className="text-2xl font-semibold tracking-tight text-ink-900">{title}</h1>
+        {subtitle && <p className="mt-1 max-w-3xl text-sm text-ink-500">{subtitle}</p>}
       </div>
       {actions && <div className="flex max-w-full flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -175,15 +175,15 @@ export function Modal({ title, children, footer, onClose, size = "md" }: { title
   }, [onClose]);
   const width = { sm: "max-w-md", md: "max-w-xl", lg: "max-w-3xl", xl: "max-w-5xl" }[size];
   return (
-    <div className="no-print fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 p-0 sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-modal="true" aria-label={title} className={clsx("flex max-h-[92vh] w-full flex-col rounded-t-2xl bg-white shadow-pop sm:rounded-2xl", width)}>
-        <div className="flex items-center justify-between border-b border-ink-100 px-5 py-3">
-          <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+    <div className="no-print fixed inset-0 z-50 flex items-end justify-center bg-ink-900/40 p-0 backdrop-blur-[2px] sm:items-center sm:p-4" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={clsx("flex max-h-[92vh] w-full flex-col rounded-t-3xl bg-white shadow-pop sm:rounded-3xl", width)}>
+        <div className="flex items-center justify-between gap-3 border-b border-ink-100 px-5 py-3.5">
+          <h2 className="min-w-0 truncate text-lg font-semibold tracking-tight text-ink-900">{title}</h2>
           <button className="rounded-md p-1 text-ink-500 hover:bg-ink-100" onClick={onClose} aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="overflow-y-auto bg-ink-50/50 px-5 py-4">{children}</div>
         {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-ink-100 px-5 py-3">{footer}</div>}
       </div>
     </div>
@@ -200,15 +200,38 @@ export function Field({ label, children, hint, className }: { label: string; chi
   );
 }
 
-export function Stat({ label, value, sub, tone, href }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "red" | "amber" | "green"; href?: string }) {
+const STAT_TINT = { red: "bg-red-100 text-red-700", amber: "bg-amber-100 text-amber-700", green: "bg-green-100 text-green-700", blue: "bg-blue-100 text-blue-700", gray: "bg-ink-100 text-ink-600" } as const;
+
+export function Stat({ label, value, sub, tone, iconTone, href, icon }: { label: string; value: ReactNode; sub?: ReactNode; tone?: "red" | "amber" | "green" | "blue"; iconTone?: "red" | "amber" | "green" | "blue"; href?: string; icon?: ReactNode }) {
   const body = (
-    <div className={clsx("card h-full p-4 transition", href && "hover:border-brand-300 hover:shadow-pop")}>
-      <p className="text-xs font-medium text-ink-500">{label}</p>
-      <p className={clsx("mt-1 text-2xl font-semibold tabular-nums", tone === "red" && "text-red-600", tone === "amber" && "text-amber-600", tone === "green" && "text-green-700")}>{value}</p>
+    <div className={clsx("card h-full p-4 transition", href && "hover:-translate-y-px hover:border-brand-300 hover:shadow-pop")}>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium text-ink-500">{label}</p>
+        {icon && <span className={clsx("flex h-8 w-8 shrink-0 items-center justify-center rounded-full", STAT_TINT[iconTone ?? tone ?? "gray"])}>{icon}</span>}
+      </div>
+      <p className={clsx("mt-1.5 text-2xl font-semibold tabular-nums", tone === "red" && "text-red-600", tone === "amber" && "text-amber-600", tone === "green" && "text-green-700", tone === "blue" && "text-blue-700")}>{value}</p>
       {sub && <p className="mt-0.5 text-xs text-ink-500">{sub}</p>}
     </div>
   );
   return href ? <a href={href}>{body}</a> : body;
+}
+
+/** A white card with a small title, used for every chart and list block so the whole site looks the same. */
+export function Panel({ title, subtitle, action, children, className }: { title?: ReactNode; subtitle?: ReactNode; action?: ReactNode; children: ReactNode; className?: string }) {
+  return (
+    <section className={clsx("card min-w-0 p-4 sm:p-5", className)}>
+      {(title || action) && (
+        <div className="mb-3 flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            {title && <h2 className="text-sm font-semibold text-ink-900">{title}</h2>}
+            {subtitle && <p className="mt-0.5 text-xs text-ink-500">{subtitle}</p>}
+          </div>
+          {action && <div className="shrink-0">{action}</div>}
+        </div>
+      )}
+      {children}
+    </section>
+  );
 }
 
 export function useDebounced<T>(value: T, ms = 200): T {

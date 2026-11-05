@@ -59,3 +59,8 @@ Upload these files to GitHub with the same folder paths (replace the old ones). 
 - This lock is in the screens only. For a lock in the database as well, ask for a Supabase policy.
 - Neither Excel file has opening stock or a godown column: set opening stock with "Update stock from Excel", and "location" means buyer state, city and channel.
 - The two files share no identical product names, so use Name matching once; every later upload then links itself.
+
+## Cleaner, lighter look (all pages)
+- Product popup Overview: short status card with chips, sold / left bar, a connected flow diagram (no black block), light cards instead of paragraphs.
+- Dashboard: icon stat cards, compact alert pills, shorter headings; uploaded-files section trimmed to the essentials.
+- Whole site: softer rounded cards, new `Panel` and icon `Stat` in `ui.tsx`, refined sidebar, top bar, table headers and popups.

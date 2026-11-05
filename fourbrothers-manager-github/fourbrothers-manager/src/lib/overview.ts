@@ -30,8 +30,12 @@ export type Tone = "green" | "amber" | "red" | "gray";
 export interface ProductMeaning {
   tone: Tone;
   headline: string;
-  /** short sentences, most important first */
+  /** short sentences, most important first (kept for the detailed view and the tests) */
   lines: string[];
+  /** one short line telling what to do, or "" when nothing is needed */
+  advice: string;
+  /** small label + value pairs shown as chips, e.g. Top state / Gujarat 41% */
+  facts: { label: string; value: string }[];
 }
 
 const STATUS: Record<StockFlag, { tone: Tone; headline: (onHand: number) => string }> = {
@@ -50,10 +54,19 @@ const ADVICE: Record<StockFlag, string> = {
   uncounted: "No opening stock or counted line has been entered for this item, so the number may be incomplete. Enter a count in the Count and names tab.",
 };
 
+const ADVICE_SHORT: Record<StockFlag, string> = {
+  ok: "",
+  low: "Plan a purchase soon.",
+  out: "Buy or make more if it still sells.",
+  negative: "Sold more than recorded. Add the opening stock or the purchase.",
+  uncounted: "Add the opening stock or a count.",
+};
+
 /** Turns a product's numbers into a few short sentences anyone can read. */
 export function explainProduct(item: Pick<StockRow, "flag" | "on_hand">, a: ProductAnalysis, periodLabel: string): ProductMeaning {
   const s = STATUS[item.flag];
   const lines: string[] = [];
+  const facts: { label: string; value: string }[] = [];
   const k = a.kpis;
   if (!k.in && !k.out && !k.adjust) {
     lines.push(`No stock moved in this period (${periodLabel}).`);
@@ -63,9 +76,15 @@ export function explainProduct(item: Pick<StockRow, "flag" | "on_hand">, a: Prod
     lines.push(`${periodLabel}: ${parts.join(", ")}.`);
   }
   const topState = a.byState.find((x) => x.label !== NOT_SET && !x.label.endsWith(" others"));
-  if (topState && topState.qty > 0) lines.push(`Most sales went to ${topState.label} (${topState.share.toFixed(0)}% of the pieces sold).`);
+  if (topState && topState.qty > 0) {
+    lines.push(`Most sales went to ${topState.label} (${topState.share.toFixed(0)}% of the pieces sold).`);
+    facts.push({ label: "Top state", value: `${topState.label} ${topState.share.toFixed(0)}%` });
+  }
   const topParty = a.parties.find((p) => p.party !== NOT_SET);
-  if (topParty) lines.push(`Biggest customer: ${topParty.party} bought ${formatNumber(topParty.qty)}.`);
+  if (topParty) {
+    lines.push(`Biggest customer: ${topParty.party} bought ${formatNumber(topParty.qty)}.`);
+    facts.push({ label: "Top customer", value: `${topParty.party} · ${formatNumber(topParty.qty)}` });
+  }
 
   // how long the stock lasts at the pace of the selected sales
   const outDates = a.lines.filter((m) => m.type === "OUT").map((m) => m.date).sort();
@@ -74,11 +93,13 @@ export function explainProduct(item: Pick<StockRow, "flag" | "on_hand">, a: Prod
     const sold = a.lines.filter((m) => m.type === "OUT").reduce((t, m) => t + (Number(m.qty) || 0), 0);
     if (span >= 14 && sold > 0) {
       const perDay = sold / span;
-      lines.push(`At this pace (${perDay >= 10 ? formatNumber(perDay) : perDay.toFixed(1)} a day) the stock on hand lasts about ${formatNumber(Math.round(item.on_hand / perDay))} days.`);
+      const days = formatNumber(Math.round(item.on_hand / perDay));
+      lines.push(`At this pace (${perDay >= 10 ? formatNumber(perDay) : perDay.toFixed(1)} a day) the stock on hand lasts about ${days} days.`);
+      facts.push({ label: "Stock lasts", value: `about ${days} days` });
     }
   }
   if (ADVICE[item.flag]) lines.push(ADVICE[item.flag]);
-  return { tone: s.tone, headline: s.headline(item.on_hand), lines };
+  return { tone: s.tone, headline: s.headline(item.on_hand), lines, advice: ADVICE_SHORT[item.flag], facts };
 }
 
 // ---------------------------------------------------------------- where one product came from and went
@@ -143,7 +164,7 @@ export function productFlow(a: ProductAnalysis, opts: { maxPerSide?: number; sal
   const used = k.out + Math.max(0, -k.adjust);
   const shortfall = Math.max(0, used - available);
   const left = Math.max(0, k.onHand);
-  if (shortfall > 0) sources.push({ label: "Not recorded yet", qty: shortfall, sub: "opening or purchase missing", kind: "gap" });
+  if (shortfall > 0) sources.push({ label: "Not recorded", qty: shortfall, sub: "opening stock or purchase missing", kind: "gap" });
   if (left > 0) sinks.push({ label: "Left in stock", qty: left, kind: "left" });
   return { sources, sinks, left, shortfall, onHand: k.onHand, total: sources.reduce((s, n) => s + n.qty, 0) };
 }

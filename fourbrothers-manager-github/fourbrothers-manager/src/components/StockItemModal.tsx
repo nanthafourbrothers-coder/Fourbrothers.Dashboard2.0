@@ -14,9 +14,9 @@ import { explainProduct, productFlow } from "@/lib/overview";
 import { formatDateDisplay, formatNumber, todayYmd } from "@/lib/parse/normalize";
 import type { StockRow } from "@/lib/stock";
 import type { Movement } from "@/lib/types";
-import { Badge, Button, Field, Modal, Popover, useUi } from "./ui";
+import { Badge, Button, Field, Modal, Panel, Popover, useUi } from "./ui";
 import { Donut, HBars, InOutChart } from "./charts";
-import { MeaningCard, SoldLeftBar, StockEquation, SupplyFlow } from "./ProductDiagrams";
+import { StatusCard, StockEquation, SupplyFlow } from "./ProductDiagrams";
 import { PeriodPicker } from "./PeriodPicker";
 
 type Tab = "overview" | "parties" | "places" | "lines" | "count";
@@ -127,7 +127,7 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
         </div>
 
         {/* period and filters */}
-        <div className="rounded-xl border border-ink-200 bg-ink-50/60 p-3">
+        <div className="card p-3">
           <button type="button" className="flex w-full items-center justify-between gap-2 text-left text-sm font-medium sm:hidden" onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}>
             <span>Period and filters: {period.label}{hasAnyFilter(filters) ? " (filtered)" : ""}</span>
             <span className="text-xs text-brand-700">{showFilters ? "Hide" : "Change"}</span>
@@ -153,48 +153,45 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
               </Button>
             </div>
           </div>
-          <p className="mt-2 hidden text-xs text-ink-500 sm:block">Showing {period.label}.</p>
         </div>
 
         <StockEquation kpis={a.kpis} />
         {salesOn && (
-          <p className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
-            Looking only at the sales you filtered: <b>{formatNumber(selectedOut)}</b> sold{shareText ? ` (${shareText})` : ""}. Opening, in and on hand above are for the whole item, because stock is held in the godown, not in a customer&apos;s city.
+          <p className="rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-sm text-brand-900">
+            Filtered sales: <b>{formatNumber(selectedOut)}</b> sold{shareText ? ` · ${shareText}` : ""}. The boxes above are for the whole item.
           </p>
         )}
 
-        <div className="flex gap-1 overflow-x-auto border-b border-ink-200">
-          {TABS.map((t) => (
-            <button key={t.id} onClick={() => setTab(t.id)} className={`whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium ${tab === t.id ? "border-brand-600 text-brand-700" : "border-transparent text-ink-600 hover:text-ink-900"}`}>
-              {t.label}
-            </button>
-          ))}
+        <div className="scroll-thin -mx-1 flex overflow-x-auto px-1 pb-1">
+          <div className="inline-flex gap-1 rounded-xl bg-ink-100 p-1">
+            {TABS.map((t) => (
+              <button key={t.id} onClick={() => setTab(t.id)} className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition ${tab === t.id ? "bg-white text-brand-700 shadow-card" : "text-ink-600 hover:text-ink-900"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {tab === "overview" && (
-          <div className="space-y-6">
-            <MeaningCard meaning={meaning} />
+          <div className="space-y-4">
+            <StatusCard meaning={meaning} kpis={a.kpis} />
 
-            <Block title="How much is sold, how much is left" hint="Everything that was available in this view, split into sold and left.">
-              <SoldLeftBar kpis={a.kpis} />
-            </Block>
-
-            <Block title="Where it came from and where it went" hint={salesOn ? "Sales are narrowed by your filters. The rest of the sales shows as other places." : "Left side: what filled the stock. Right side: where it was sold and what is left. Thicker lines mean more pieces."}>
+            <Block title="Where it came from and where it went">
               <SupplyFlow flow={flow} name={item.name} />
             </Block>
 
-            <Block title={`Stock in, out and on hand ${a.grain === "day" ? "per day" : a.grain === "week" ? "per week" : "per month"}`} hint="Green and red bars are pieces bought and sold. The blue line is the stock left after each date.">
+            <Block title={`Stock ${a.grain === "day" ? "per day" : a.grain === "week" ? "per week" : "per month"}`}>
               <InOutChart data={a.series} />
             </Block>
 
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-              <Block title="Sold by state" hint="Click a name to filter this item to that state.">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <Block title="Sold by state" subtitle="Tap to filter">
                 <Donut rows={a.byState} centerBottom="sold" onPick={toggle("states")} picked={filters.states} empty="No sales in this selection." />
               </Block>
-              <Block title="Sold by channel" hint="Click a name to filter.">
+              <Block title="Sold by channel" subtitle="Tap to filter">
                 <Donut rows={a.byChannel} centerBottom="sold" onPick={toggle("channels")} picked={filters.channels} empty="No sales in this selection." />
               </Block>
-              <Block title="Top customers" hint="Click a name to filter.">
+              <Block title="Top customers" subtitle="Tap to filter">
                 <HBars rows={a.parties.slice(0, 8).map((p) => ({ label: p.party, qty: p.qty, sub: `${p.invoices} invoice${p.invoices === 1 ? "" : "s"}${p.city ? ` | ${p.city}` : ""}` }))} onPick={toggle("parties")} picked={filters.parties} empty="No sales in this selection." />
               </Block>
             </div>
@@ -279,7 +276,7 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
 
         {tab === "places" && (
           <div className="space-y-5">
-            <p className="text-sm text-ink-600">Click any bar to filter this item to that place. The list at the bottom then shows what else was sold there.</p>
+            <p className="text-sm text-ink-600">Tap a bar to filter by that place.</p>
             <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
               <Block title="By state">
                 <HBars rows={a.byState} onPick={toggle("states")} picked={filters.states} empty="No sales in this selection." />
@@ -408,14 +405,11 @@ export function StockItemModal({ item, onClose, onOpenProduct }: { item: StockRo
   );
 }
 
-function Block({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Block({ title, subtitle, hint, children }: { title: string; subtitle?: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="min-w-0">
-      <h3 className="text-sm font-semibold text-ink-900">{title}</h3>
-      {hint && <p className="mb-2 text-xs text-ink-500">{hint}</p>}
-      {!hint && <div className="mb-1.5" />}
+    <Panel title={title} subtitle={subtitle ?? hint}>
       {children}
-    </section>
+    </Panel>
   );
 }
 

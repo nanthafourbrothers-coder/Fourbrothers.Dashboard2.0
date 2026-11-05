@@ -13,7 +13,8 @@ import type { Movement } from "@/lib/types";
 import { LowStockAlert } from "@/components/LowStockAlert";
 import { Donut, InOutChart, type Slice } from "@/components/charts";
 import { UploadOverview } from "@/components/UploadOverview";
-import { Badge, EmptyState, Field, PageHeader, Spinner, Stat, useLocalPref } from "@/components/ui";
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Boxes, PackageX, Truck, TrendingDown } from "lucide-react";
+import { Badge, EmptyState, Field, PageHeader, Panel, Spinner, Stat, useLocalPref } from "@/components/ui";
 
 type Range = "7" | "30" | "90" | "365" | "all" | "custom";
 const RANGES: { id: Range; label: string }[] = [
@@ -142,7 +143,7 @@ export default function DashboardPage() {
     <div className="space-y-5">
       <PageHeader
         title={`Hello${auth.profile?.full_name ? ", " + auth.profile.full_name.split(" ")[0] : ""}`}
-        subtitle="Stock position and movement for fourbrothers.in and your other sales channels."
+        subtitle="Your stock and sales at a glance."
         actions={
           <div className="flex max-w-full flex-wrap items-end gap-2">
             <div className="scroll-thin flex max-w-full overflow-x-auto rounded-lg border border-ink-200 bg-white p-0.5 text-sm">
@@ -180,79 +181,54 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
-            <Stat label="Stock items" value={formatNumber(stock.length)} sub={`${formatNumber(onHand)} units on hand`} href="/stock" />
-            <Stat label="Stock in (period)" value={formatNumber(totals.i)} tone="green" href="/movements?type=IN" />
-            <Stat label="Stock out (period)" value={formatNumber(totals.o)} sub={`${formatNumber(totals.invoices)} invoices`} href="/movements?type=OUT" />
-            <Stat label="Out of stock" value={counts.out} tone={counts.out ? "red" : undefined} href="/stock?flag=out" />
-            <Stat label="Running low" value={counts.low} tone={counts.low ? "amber" : undefined} href="/stock?flag=low" />
-            <Stat label="Shipments to send" value={openShipments} sub="Pending or packed" href="/shipments" />
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+            <Stat label="Stock items" value={formatNumber(stock.length)} sub={`${formatNumber(onHand)} pieces on hand`} href="/stock" icon={<Boxes className="h-4 w-4" />} iconTone="blue" />
+            <Stat label="Bought" value={formatNumber(totals.i)} sub="pieces in this period" tone="green" href="/movements?type=IN" icon={<ArrowDownToLine className="h-4 w-4" />} />
+            <Stat label="Sold" value={formatNumber(totals.o)} sub={`${formatNumber(totals.invoices)} invoices`} href="/movements?type=OUT" icon={<ArrowUpFromLine className="h-4 w-4" />} iconTone="red" />
+            <Stat label="Out of stock" value={counts.out} tone={counts.out ? "red" : undefined} href="/stock?flag=out" icon={<PackageX className="h-4 w-4" />} iconTone="red" />
+            <Stat label="Running low" value={counts.low} tone={counts.low ? "amber" : undefined} href="/stock?flag=low" icon={<TrendingDown className="h-4 w-4" />} iconTone="amber" />
+            <Stat label="To ship" value={openShipments} sub="pending or packed" href="/shipments" icon={<Truck className="h-4 w-4" />} iconTone="blue" />
           </div>
 
           <LowStockAlert />
 
           {(unmapped > 0 || counts.neg > 0 || counts.uncounted > 0) && (
-            <div className="card flex flex-wrap items-center gap-x-6 gap-y-1 border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-900">
-              {unmapped > 0 && (
-                <span>
-                  {formatNumber(unmapped)} names in your files are not linked to a stock item yet.{" "}
-                  <Link className="font-medium underline" href="/mapping">
-                    Match them
-                  </Link>
-                </span>
-              )}
-              {counts.uncounted > 0 && (
-                <span>
-                  {formatNumber(counts.uncounted)} items have no opening stock or counted lines yet.{" "}
-                  <Link className="font-medium underline" href="/stock?flag=uncounted">
-                    See them
-                  </Link>
-                </span>
-              )}
-              {counts.neg > 0 && (
-                <span>
-                  {counts.neg} item(s) show stock below zero. Usually opening stock or a purchase has not been entered.{" "}
-                  <Link className="font-medium underline" href="/stock?flag=negative">
-                    See them
-                  </Link>
-                </span>
-              )}
+            <div className="flex flex-wrap gap-2">
+              {unmapped > 0 && <Notice href="/mapping" text={`${formatNumber(unmapped)} name${unmapped === 1 ? "" : "s"} not linked`} action="Match" />}
+              {counts.uncounted > 0 && <Notice href="/stock?flag=uncounted" text={`${formatNumber(counts.uncounted)} items without a count`} action="See" />}
+              {counts.neg > 0 && <Notice href="/stock?flag=negative" text={`${counts.neg} item${counts.neg === 1 ? "" : "s"} below zero`} action="See" />}
             </div>
           )}
 
           <UploadOverview />
 
-          <div className="card p-4">
-            <div className="mb-2">
-              <h2 className="text-sm font-semibold text-ink-900">Stock in and out ({chart.mode === "day" ? "per day" : chart.mode === "week" ? "per week" : "per month"})</h2>
-              <p className="text-xs text-ink-500">Green bars are pieces that came in, red bars are pieces that went out.</p>
-            </div>
+          <Panel title={`Stock in and out ${chart.mode === "day" ? "per day" : chart.mode === "week" ? "per week" : "per month"}`}>
             <InOutChart data={chart.data} showStock={false} />
-          </div>
+          </Panel>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <Panel title="Top selling items (period)">
+            <Panel title="Top selling items">
               <Bars rows={breakdowns.items} />
             </Panel>
-            <Panel title="Sales by channel (period)">
+            <Panel title="Sales by channel">
               <Donut rows={toSlices(breakdowns.channels)} centerBottom="sold" empty="No sales in this period." />
             </Panel>
-            <Panel title="Sales by state (period)">
+            <Panel title="Sales by state">
               <Donut rows={toSlices(breakdowns.states)} centerBottom="sold" empty="No sales in this period." />
             </Panel>
           </div>
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <Panel title="Top customers / parties (period)" action={<Link className="text-xs text-brand-700 hover:underline" href="/movements?type=OUT">Sales register</Link>}>
+            <Panel title="Top customers" action={<Link className="text-xs font-medium text-brand-700 hover:underline" href="/movements?type=OUT">Open</Link>}>
               <Bars rows={breakdowns.parties} />
             </Panel>
-            <Panel title="Most received (period)" action={<Link className="text-xs text-brand-700 hover:underline" href="/movements?type=IN">Receipts</Link>}>
+            <Panel title="Most bought" action={<Link className="text-xs font-medium text-brand-700 hover:underline" href="/movements?type=IN">Open</Link>}>
               <Bars rows={breakdowns.received} empty="No receipts in this period." />
             </Panel>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
-            <Panel title="Latest entries" action={<Link className="text-xs text-brand-700 hover:underline" href="/movements">Open all</Link>}>
+            <Panel title="Latest entries" action={<Link className="text-xs font-medium text-brand-700 hover:underline" href="/movements">Open all</Link>}>
               <ul className="divide-y divide-ink-100 text-sm">
                 {recent.map((m: Movement) => (
                   <li key={m.id} className="flex items-center gap-2 py-1.5">
@@ -272,15 +248,13 @@ export default function DashboardPage() {
   );
 }
 
-function Panel({ title, action, children }: { title: string; action?: React.ReactNode; children: React.ReactNode }) {
+function Notice({ href, text, action }: { href: string; text: string; action: string }) {
   return (
-    <div className="card min-w-0 p-4">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
-        {action}
-      </div>
-      {children}
-    </div>
+    <Link href={href} className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-sm text-amber-900 transition hover:bg-amber-100">
+      <AlertTriangle className="h-4 w-4 text-amber-600" />
+      {text}
+      <span className="font-semibold text-brand-700">{action} →</span>
+    </Link>
   );
 }
 
@@ -295,8 +269,8 @@ function Bars({ rows, empty = "No sales in this period." }: { rows: [string, num
             <span className="min-w-0 truncate" title={label}>{label}</span>
             <span className="tabular-nums text-ink-700">{formatNumber(v)}</span>
           </div>
-          <div className="mt-0.5 h-1.5 rounded-full bg-ink-100">
-            <div className="h-1.5 rounded-full bg-brand-500" style={{ width: `${Math.max(2, (v / max) * 100)}%` }} />
+          <div className="mt-1 h-2 rounded-full bg-ink-100">
+            <div className="h-2 rounded-full bg-brand-500" style={{ width: `${Math.max(2, (v / max) * 100)}%` }} />
           </div>
         </li>
       ))}

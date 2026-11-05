@@ -119,11 +119,13 @@ function ShellInner({ children }: { children: ReactNode }) {
   ];
 
   const brand = (
-    <Link href="/" className="flex items-center gap-2.5 px-5 py-4">
-      <PackageCheck className="h-6 w-6 text-brand-600" />
+    <Link href="/" className="flex items-center gap-3 px-5 py-5">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-600 text-white shadow-card">
+        <PackageCheck className="h-5 w-5" />
+      </span>
       <div className="leading-tight">
         <p className="text-sm font-bold tracking-wide text-ink-900">FOURBROTHERS</p>
-        <p className="text-[11px] font-medium text-brand-600">MANAGER</p>
+        <p className="text-[11px] font-semibold tracking-widest text-brand-600">MANAGER</p>
       </div>
     </Link>
   );
@@ -152,7 +154,7 @@ function ShellInner({ children }: { children: ReactNode }) {
       )}
 
       <div className="lg:pl-60">
-        <header className="no-print sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200 bg-white/90 px-4 py-2.5 backdrop-blur">
+        <header className="no-print sticky top-0 z-20 flex items-center gap-3 border-b border-ink-200/80 bg-white/85 px-4 py-3 backdrop-blur-md sm:px-6">
           <button className="rounded-lg p-1.5 hover:bg-ink-100 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
             <Menu className="h-5 w-5" />
           </button>
@@ -163,8 +165,8 @@ function ShellInner({ children }: { children: ReactNode }) {
               if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`);
             }}
           >
-            <Search className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-ink-400" />
-            <input className="input pl-8" placeholder="Search everything: item, invoice, customer, phone, city…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search everything" />
+            <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-ink-400" />
+            <input className="input rounded-xl border-transparent bg-ink-100 pl-8 focus:bg-white" placeholder="Search items, invoices, customers…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search everything" />
           </form>
           <div className="ml-auto flex items-center gap-3">
             <Link href="/stock?flag=attention" className="relative rounded-lg p-1.5 hover:bg-ink-100" aria-label={needAttention ? `${needAttention} stock items need attention` : "No stock alerts"} title={needAttention ? `${needAttention} stock items need attention` : "No stock alerts"}>
@@ -173,7 +175,7 @@ function ShellInner({ children }: { children: ReactNode }) {
             </Link>
             {auth.mode === "local" && (
               <span className="hidden rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 sm:inline" title="Supabase keys are not set, so data stays in this browser only.">
-                Demo mode: data stays in this browser
+                Demo mode
               </span>
             )}
             <div className="hidden text-right leading-tight sm:block">
@@ -187,7 +189,7 @@ function ShellInner({ children }: { children: ReactNode }) {
             )}
           </div>
         </header>
-        <main className="mx-auto max-w-[1500px] p-4 pb-24 sm:p-6 lg:pb-6">
+        <main className="mx-auto max-w-[1500px] p-4 pb-24 sm:p-6 lg:p-8 lg:pb-8">
           <Suspense fallback={<Spinner />}>{children}</Suspense>
         </main>
       </div>
@@ -221,12 +223,12 @@ function NavList({ groups, sections }: { groups: { title: string; items: NavItem
         if (!items.length) return null;
         return (
           <div key={g.title} className="mt-4">
-            <p className="px-2 pb-1 text-[11px] font-semibold text-ink-400">{g.title}</p>
+            <p className="px-2.5 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-ink-400">{g.title}</p>
             {items.map((i) => (
               <Link
                 key={i.href}
                 href={i.href}
-                className={clsx("flex items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-sm font-medium transition", active(i.href) ? "bg-brand-50 text-brand-700" : "text-ink-700 hover:bg-ink-100")}
+                className={clsx("relative flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition", active(i.href) ? "bg-brand-50 text-brand-700 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-brand-600" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900")}
               >
                 {i.icon}
                 <span className="flex-1 truncate">{i.label}</span>
@@ -257,9 +259,9 @@ function NavList({ groups, sections }: { groups: { title: string; items: NavItem
 function BottomBar({ items, onMore }: { items: { href: string; label: string; icon: ReactNode }[]; onMore: () => void }) {
   const active = useIsActive();
   return (
-    <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-200 bg-white pb-[env(safe-area-inset-bottom)] lg:hidden" aria-label="Main">
+    <nav className="no-print fixed inset-x-0 bottom-0 z-30 flex border-t border-ink-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-pop backdrop-blur lg:hidden" aria-label="Main">
       {items.map((i) => (
-        <Link key={i.href} href={i.href} className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", active(i.href) ? "text-brand-700" : "text-ink-500")}>
+        <Link key={i.href} href={i.href} className={clsx("flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition", active(i.href) ? "text-brand-700" : "text-ink-500")}>
           {i.icon}
           {i.label}
         </Link>

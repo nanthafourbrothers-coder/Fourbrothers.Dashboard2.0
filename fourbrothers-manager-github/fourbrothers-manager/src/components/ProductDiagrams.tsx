@@ -1,50 +1,59 @@
 "use client";
 
-// The visual pieces of the product popup: the stock equation, the sold / left bar,
-// the plain-words summary and the "where it came from, where it went" flow diagram.
+// The visual pieces of the product popup: the stock equation, the status card with the sold / left bar,
+// and the "came from / went to" flow diagram. Light colours, very little text.
 
-import { AlertTriangle, ArrowDown, CheckCircle2, Info, XCircle } from "lucide-react";
+import { useId } from "react";
+import { AlertTriangle, Archive, ArrowDown, ArrowDownToLine, ArrowUpFromLine, Boxes, CheckCircle2, Info, SlidersHorizontal, XCircle } from "lucide-react";
 import type { Kpis } from "@/lib/analysis";
 import type { FlowNode, ProductFlow, ProductMeaning, Tone } from "@/lib/overview";
 import { formatNumber } from "@/lib/parse/normalize";
-import { BLUE, GREEN, Key, RED, useElementWidth } from "./charts";
+import { BLUE, GREEN, RED, useElementWidth } from "./charts";
+
+const SLATE = "#64748b";
+const AMBER = "#d97706";
 
 // ---------------------------------------------------------------- opening + in - out = on hand
 
 export function StockEquation({ kpis }: { kpis: Kpis }) {
   const neg = kpis.onHand < 0;
-  const cards: { label: string; sign: string; op: string; value: number; box: string; text: string; wide?: boolean }[] = [
-    { label: "Opening", sign: "", op: "", value: kpis.opening, box: "border-ink-200 bg-white", text: "text-ink-900" },
-    { label: "In (purchases)", sign: "+ ", op: "+", value: kpis.in, box: "border-green-200 bg-green-50", text: "text-green-700" },
-    { label: "Out (sales)", sign: "− ", op: "−", value: kpis.out, box: "border-red-200 bg-red-50", text: "text-red-700" },
-    { label: "Adjusted", sign: "± ", op: "±", value: kpis.adjust, box: "border-amber-200 bg-amber-50", text: "text-amber-800" },
-    { label: "On hand", sign: "= ", op: "=", value: kpis.onHand, box: neg ? "border-red-300 bg-red-50" : "border-blue-200 bg-blue-50", text: neg ? "text-red-700" : "text-blue-700", wide: true },
+  const cards = [
+    { label: "Opening", op: "", value: kpis.opening, icon: <Archive className="h-4 w-4" />, tint: "bg-slate-100 text-slate-600", num: "text-ink-900" },
+    { label: "Bought", op: "+", value: kpis.in, icon: <ArrowDownToLine className="h-4 w-4" />, tint: "bg-green-100 text-green-700", num: "text-green-700" },
+    { label: "Sold", op: "−", value: kpis.out, icon: <ArrowUpFromLine className="h-4 w-4" />, tint: "bg-red-100 text-red-700", num: "text-red-700" },
+    { label: "Adjusted", op: "±", value: kpis.adjust, icon: <SlidersHorizontal className="h-4 w-4" />, tint: "bg-amber-100 text-amber-700", num: "text-amber-700" },
+    { label: "On hand", op: "=", value: kpis.onHand, icon: <Boxes className="h-4 w-4" />, tint: neg ? "bg-red-600 text-white" : "bg-blue-600 text-white", num: neg ? "text-red-700" : "text-blue-700", strong: true },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:flex sm:items-stretch sm:gap-1.5" role="group" aria-label="Opening plus in minus out plus adjusted equals on hand">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5" role="group" aria-label="Opening plus bought minus sold plus adjusted equals on hand">
       {cards.map((c, i) => (
-        <div key={c.label} className="contents sm:flex sm:flex-1 sm:items-stretch sm:gap-1.5">
+        <div key={c.label} className={`relative rounded-2xl border bg-white p-3 shadow-card ${c.strong ? (neg ? "col-span-2 border-red-200 sm:col-span-1" : "col-span-2 border-blue-200 sm:col-span-1") : "border-ink-200"}`}>
           {i > 0 && (
-            <span className="hidden items-center text-lg font-semibold text-ink-400 sm:flex" aria-hidden>
+            <span className="absolute -left-[0.95rem] top-1/2 z-10 hidden h-5 w-5 -translate-y-1/2 items-center justify-center rounded-full border border-ink-200 bg-white text-xs font-semibold text-ink-500 sm:flex" aria-hidden>
               {c.op}
             </span>
           )}
-          <div className={`min-w-0 rounded-lg border px-3 py-2 sm:flex-1 ${c.box} ${c.wide ? "col-span-2" : ""}`}>
-            <p className="text-xs text-ink-600">
-              <span className="sm:hidden">{c.sign}</span>
-              {c.label}
-            </p>
-            <p className={`text-xl font-semibold tabular-nums ${c.text}`}>{formatNumber(c.value)}</p>
+          <div className="flex items-center gap-2">
+            <span className={`flex h-7 w-7 items-center justify-center rounded-full ${c.tint}`}>{c.icon}</span>
+            <span className="text-xs font-medium text-ink-500">{c.label}</span>
           </div>
+          <p className={`mt-2 text-2xl font-semibold tabular-nums ${c.num}`}>{formatNumber(c.value)}</p>
         </div>
       ))}
     </div>
   );
 }
 
-// ---------------------------------------------------------------- how much of the stock was sold
+// ---------------------------------------------------------------- status, with the sold / left bar
 
-/** One bar: of everything that was available, how much is sold and how much is left. */
+const TONE: Record<Tone, { ring: string; icon: React.ReactNode; title: string }> = {
+  green: { ring: "bg-green-100", icon: <CheckCircle2 className="h-5 w-5 text-green-700" />, title: "text-green-800" },
+  amber: { ring: "bg-amber-100", icon: <AlertTriangle className="h-5 w-5 text-amber-700" />, title: "text-amber-800" },
+  red: { ring: "bg-red-100", icon: <XCircle className="h-5 w-5 text-red-700" />, title: "text-red-800" },
+  gray: { ring: "bg-slate-100", icon: <Info className="h-5 w-5 text-slate-600" />, title: "text-ink-800" },
+};
+
+/** One bar: of everything that was available, how much is sold, how much is left, how much has no stock record. */
 export function SoldLeftBar({ kpis }: { kpis: Kpis }) {
   const available = kpis.opening + kpis.in + Math.max(0, kpis.adjust);
   const sold = kpis.out + Math.max(0, -kpis.adjust);
@@ -54,55 +63,59 @@ export function SoldLeftBar({ kpis }: { kpis: Kpis }) {
   const left = Math.max(0, available - sold);
   const gap = Math.max(0, sold - available);
   const pct = (n: number) => `${(n / total) * 100}%`;
-  const soldShare = available > 0 ? Math.round((soldOk / available) * 100) : 100;
   return (
     <div>
-      <p className="mb-1.5 text-sm text-ink-700">
-        {gap > 0 ? (
-          <>
-            <b>{formatNumber(sold)}</b> sold, but only <b>{formatNumber(available)}</b> {available === 1 ? "was" : "were"} recorded as available. <b className="text-red-700">{formatNumber(gap)}</b> more than recorded.
-          </>
-        ) : (
-          <>
-            Of <b>{formatNumber(available)}</b> available, <b className="text-red-700">{formatNumber(sold)}</b> sold ({soldShare}%) and <b className="text-blue-700">{formatNumber(left)}</b> left.
-          </>
-        )}
-      </p>
-      <div className="flex h-5 overflow-hidden rounded-full bg-ink-100" role="img" aria-label={`Sold ${formatNumber(sold)}, left ${formatNumber(left)}${gap ? `, not recorded ${formatNumber(gap)}` : ""}`}>
-        {soldOk > 0 && <div style={{ width: pct(soldOk), background: RED }} title={`Sold ${formatNumber(soldOk)}`} />}
-        {gap > 0 && <div style={{ width: pct(gap), background: "repeating-linear-gradient(45deg,#8f121a,#8f121a 4px,#d31b25 4px,#d31b25 8px)" }} title={`Sold but not recorded as received: ${formatNumber(gap)}`} />}
-        {left > 0 && <div style={{ width: pct(left), background: BLUE }} title={`Left ${formatNumber(left)}`} />}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-1">
+        <div className="flex flex-wrap gap-x-6 gap-y-1">
+          <Num color={RED} label="Sold" value={sold} />
+          <Num color={BLUE} label="Left" value={left} />
+          {gap > 0 && <Num color={AMBER} label="Not recorded" value={gap} hatch />}
+        </div>
+        {gap === 0 && available > 0 && <p className="text-sm font-semibold tabular-nums text-ink-700">{Math.round((soldOk / available) * 100)}% sold</p>}
       </div>
-      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-600">
-        <Key color={RED} label="Sold" />
-        <Key color={BLUE} label="Left" />
-        {gap > 0 && <Key color="#8f121a" label="Sold but never recorded as received" />}
+      <div className="mt-2 flex h-3 overflow-hidden rounded-full bg-ink-100" role="img" aria-label={`Sold ${formatNumber(sold)}, left ${formatNumber(left)}${gap ? `, not recorded ${formatNumber(gap)}` : ""}`}>
+        {soldOk > 0 && <div style={{ width: pct(soldOk), background: RED }} />}
+        {gap > 0 && <div style={{ width: pct(gap), background: "repeating-linear-gradient(45deg,#fcd9a6,#fcd9a6 4px,#f5b455 4px,#f5b455 8px)" }} />}
+        {left > 0 && <div style={{ width: pct(left), background: BLUE }} />}
       </div>
     </div>
   );
 }
 
-// ---------------------------------------------------------------- the plain-words summary
-
-const MEANING_STYLE: Record<Tone, { box: string; icon: React.ReactNode }> = {
-  green: { box: "border-green-200 bg-green-50 text-green-900", icon: <CheckCircle2 className="h-5 w-5 text-green-600" /> },
-  amber: { box: "border-amber-200 bg-amber-50 text-amber-900", icon: <AlertTriangle className="h-5 w-5 text-amber-600" /> },
-  red: { box: "border-red-200 bg-red-50 text-red-900", icon: <XCircle className="h-5 w-5 text-red-600" /> },
-  gray: { box: "border-ink-200 bg-ink-50 text-ink-800", icon: <Info className="h-5 w-5 text-ink-500" /> },
-};
-
-export function MeaningCard({ meaning }: { meaning: ProductMeaning }) {
-  const st = MEANING_STYLE[meaning.tone];
+function Num({ color, label, value, hatch }: { color: string; label: string; value: number; hatch?: boolean }) {
   return (
-    <div className={`flex gap-3 rounded-xl border p-3 ${st.box}`}>
-      <span className="mt-0.5 shrink-0">{st.icon}</span>
-      <div className="min-w-0 text-sm">
-        <p className="font-semibold">{meaning.headline}</p>
-        <ul className="mt-1 space-y-1">
-          {meaning.lines.map((l, i) => (
-            <li key={i}>{l}</li>
+    <div className="flex items-baseline gap-2">
+      <span className="h-2.5 w-2.5 shrink-0 translate-y-px rounded-full" style={hatch ? { background: "repeating-linear-gradient(45deg,#fcd9a6,#fcd9a6 2px,#f5b455 2px,#f5b455 4px)", boxShadow: `0 0 0 1px ${color}` } : { background: color }} />
+      <span className="text-xs text-ink-500">{label}</span>
+      <span className="text-lg font-semibold tabular-nums text-ink-900">{formatNumber(value)}</span>
+    </div>
+  );
+}
+
+/** Status of the item in one headline, one short instruction, a few chips, and the sold / left bar. */
+export function StatusCard({ meaning, kpis }: { meaning: ProductMeaning; kpis: Kpis }) {
+  const t = TONE[meaning.tone];
+  return (
+    <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-card">
+      <div className="flex items-start gap-3">
+        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${t.ring}`}>{t.icon}</span>
+        <div className="min-w-0">
+          <p className={`text-base font-semibold ${t.title}`}>{meaning.headline}</p>
+          {meaning.advice && <p className="text-sm text-ink-600">{meaning.advice}</p>}
+        </div>
+      </div>
+      {meaning.facts.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {meaning.facts.map((f) => (
+            <span key={f.label} className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-ink-50 px-3 py-1 text-xs ring-1 ring-inset ring-ink-200">
+              <span className="shrink-0 text-ink-500">{f.label}</span>
+              <b className="truncate font-semibold text-ink-900">{f.value}</b>
+            </span>
           ))}
-        </ul>
+        </div>
+      )}
+      <div className="mt-4">
+        <SoldLeftBar kpis={kpis} />
       </div>
     </div>
   );
@@ -110,25 +123,30 @@ export function MeaningCard({ meaning }: { meaning: ProductMeaning }) {
 
 // ---------------------------------------------------------------- where it came from, where it went
 
-const nodeColor = (n: FlowNode, side: "src" | "sink"): string => (n.kind === "gap" ? "#8f121a" : n.kind === "left" ? BLUE : side === "src" ? (n.label === "Opening stock" ? "#71717a" : GREEN) : RED);
+function nodeColor(n: FlowNode, side: "src" | "sink"): string {
+  if (n.kind === "gap") return AMBER;
+  if (n.kind === "left") return BLUE;
+  if (side === "src") return n.label === "Opening stock" ? SLATE : GREEN;
+  return RED;
+}
 
 function clip(s: string, max: number): string {
   return s.length > max ? `${s.slice(0, Math.max(1, max - 1))}…` : s;
 }
 
 /**
- * Left: what filled the stock. Middle: this item. Right: where it went and what is left.
- * Wide screens get a flow diagram with ribbons as thick as the numbers; phones get the same story top to bottom.
+ * Left: what filled the stock. Right: where it went and what is left. In the middle, ribbons as thick as the numbers
+ * meet in one block. Wide screens get the diagram; phones get the same story top to bottom.
  */
 export function SupplyFlow({ flow, name }: { flow: ProductFlow; name: string }) {
   const [ref, width] = useElementWidth();
   const empty = !flow.sources.length && !flow.sinks.length;
-  const wide = width >= 700;
+  const wide = width >= 640;
   let body: React.ReactNode;
   if (empty) body = <p className="py-8 text-center text-sm text-ink-500">No stock to draw for this selection.</p>;
   else if (!width) body = <div style={{ height: 200 }} />;
   else if (wide) body = <WideFlow flow={flow} name={name} width={width} />;
-  else body = <StackedFlow flow={flow} name={name} />;
+  else body = <StackedFlow flow={flow} />;
   return (
     <div ref={ref} className="w-full">
       {body}
@@ -137,107 +155,120 @@ export function SupplyFlow({ flow, name }: { flow: ProductFlow; name: string }) 
 }
 
 function WideFlow({ flow, name, width }: { flow: ProductFlow; name: string; width: number }) {
+  const uid = useId().replace(/:/g, "");
   const W = width;
-  const colW = Math.min(230, Math.round(W * 0.27));
-  const midW = Math.min(180, Math.round(W * 0.2));
-  const gap = (W - 2 * colW - midW) / 2;
-  const leftX = 0;
-  const midX = colW + gap;
-  const rightX = W - colW;
-  const rowH = 52;
-  const nodeH = 40;
-  const pad = 22;
-  const rows = Math.max(flow.sources.length, flow.sinks.length, 3);
-  const H = pad * 2 + rows * rowH;
-  const maxQty = Math.max(...flow.sources.map((n) => n.qty), ...flow.sinks.map((n) => n.qty), 1);
-  const ribbon = (q: number) => Math.max(3, (q / maxQty) * 30);
-  const colTop = (count: number) => pad + ((rows - count) * rowH) / 2;
-  const midTop = pad;
-  const midH = H - pad * 2;
-  const chars = Math.max(10, Math.floor((colW - 22) / 6.4));
+  const nodeW = Math.min(220, Math.round(W * 0.27));
+  const midW = Math.min(140, Math.round(W * 0.17));
+  const midX = Math.round((W - midW) / 2);
+  const rightX = W - nodeW;
+  const GAP = 10;
+  const MINH = 32;
+  const TOP = 26;
+  const total = Math.max(flow.total, 1);
+  const k = 190 / total;
+  const heights = (nodes: FlowNode[]) => nodes.map((n) => Math.max(MINH, n.qty * k));
+  const hL = heights(flow.sources);
+  const hR = heights(flow.sinks);
+  const sum = (a: number[]) => a.reduce((s, x) => s + x, 0);
+  const stack = (a: number[]) => sum(a) + GAP * Math.max(0, a.length - 1);
+  const body = Math.max(stack(hL), stack(hR), 130);
+  const H = TOP + body + 6;
+  const startL = TOP + (body - stack(hL)) / 2;
+  const startR = TOP + (body - stack(hR)) / 2;
+  const midH = Math.max(sum(hL), sum(hR), 90);
+  const midTop = TOP + (body - midH) / 2;
+  const segL0 = midTop + (midH - sum(hL)) / 2;
+  const segR0 = midTop + (midH - sum(hR)) / 2;
+  const chars = Math.max(8, Math.floor((nodeW - 92) / 6.6));
 
-  // where each ribbon meets the middle box: spread evenly down its edge
-  const slot = (i: number, count: number) => midTop + 24 + ((midH - 48) * (count === 1 ? 0.5 : i / (count - 1)));
-
-  const link = (x1: number, y1: number, x2: number, y2: number) => {
+  const ribbon = (x1: number, y1: number, x2: number, y2: number, h: number) => {
     const mx = (x1 + x2) / 2;
-    return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
+    return `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2} L${x2},${y2 + h} C${mx},${y2 + h} ${mx},${y1 + h} ${x1},${y1 + h} Z`;
   };
+
+  let yl = startL;
+  let sl = segL0;
+  let yr = startR;
+  let sr = segR0;
+  const left = flow.sources.map((n, i) => {
+    const h = hL[i];
+    const out = { n, h, y: yl, seg: sl };
+    yl += h + GAP;
+    sl += h;
+    return out;
+  });
+  const right = flow.sinks.map((n, i) => {
+    const h = hR[i];
+    const out = { n, h, y: yr, seg: sr };
+    yr += h + GAP;
+    sr += h;
+    return out;
+  });
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width={W} height={H} className="block max-w-full" role="img" aria-label={`Flow diagram. ${flow.sources.map((n) => `${n.label} ${formatNumber(n.qty)}`).join(", ")} flow into ${name}. ${flow.sinks.map((n) => `${n.label} ${formatNumber(n.qty)}`).join(", ")} flow out.`}>
-      <text x={leftX} y={13} fontSize={11} fontWeight={600} fill="#15803d">
+      <defs>
+        {[...left.map((x, i) => ({ id: `${uid}l${i}`, c: nodeColor(x.n, "src"), dir: 0 })), ...right.map((x, i) => ({ id: `${uid}r${i}`, c: nodeColor(x.n, "sink"), dir: 1 }))].map((g) => (
+          <linearGradient key={g.id} id={g.id} x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0" stopColor={g.dir ? "#94a3b8" : g.c} stopOpacity={g.dir ? 0.16 : 0.3} />
+            <stop offset="1" stopColor={g.dir ? g.c : "#94a3b8"} stopOpacity={g.dir ? 0.3 : 0.16} />
+          </linearGradient>
+        ))}
+      </defs>
+      <text x={0} y={14} fontSize={11} fontWeight={600} fill="#9a9aa4" letterSpacing={0.6}>
         CAME FROM
       </text>
-      <text x={W} y={13} fontSize={11} fontWeight={600} fill="#b01019" textAnchor="end">
+      <text x={W} y={14} fontSize={11} fontWeight={600} fill="#9a9aa4" letterSpacing={0.6} textAnchor="end">
         WENT TO
       </text>
 
-      {flow.sources.map((n, i) => {
-        const y = colTop(flow.sources.length) + i * rowH + rowH / 2;
-        const c = nodeColor(n, "src");
-        return (
-          <g key={`s${i}`}>
-            <path d={link(leftX + colW, y, midX, slot(i, flow.sources.length))} fill="none" stroke={c} strokeOpacity={0.28} strokeWidth={ribbon(n.qty)} />
-            <rect x={leftX} y={y - nodeH / 2} width={colW} height={nodeH} rx={8} fill="#fff" stroke="#e4e4e7" />
-            <rect x={leftX} y={y - nodeH / 2} width={5} height={nodeH} rx={2.5} fill={c} />
-            <text x={leftX + 14} y={y - 3} fontSize={12} fontWeight={600} fill="#27272a">
-              {clip(n.label, chars - 6)}
-            </text>
-            <text x={leftX + 14} y={y + 12} fontSize={11} fill="#71717a">
-              {n.sub ? clip(n.sub, chars - 8) : ""}
-            </text>
-            <text x={leftX + colW - 10} y={y + 5} fontSize={13} fontWeight={700} fill={c} textAnchor="end">
-              {formatNumber(n.qty)}
-            </text>
-            <title>{`${n.label}: ${formatNumber(n.qty)}`}</title>
-          </g>
-        );
-      })}
+      {left.map((x, i) => (
+        <path key={`lr${i}`} d={ribbon(nodeW, x.y, midX, x.seg, x.h)} fill={`url(#${uid}l${i})`} />
+      ))}
+      {right.map((x, i) => (
+        <path key={`rr${i}`} d={ribbon(midX + midW, x.seg, rightX, x.y, x.h)} fill={`url(#${uid}r${i})`} />
+      ))}
 
-      {flow.sinks.map((n, i) => {
-        const y = colTop(flow.sinks.length) + i * rowH + rowH / 2;
-        const c = nodeColor(n, "sink");
-        return (
-          <g key={`k${i}`}>
-            <path d={link(midX + midW, slot(i, flow.sinks.length), rightX, y)} fill="none" stroke={c} strokeOpacity={0.28} strokeWidth={ribbon(n.qty)} />
-            <rect x={rightX} y={y - nodeH / 2} width={colW} height={nodeH} rx={8} fill="#fff" stroke="#e4e4e7" />
-            <rect x={rightX + colW - 5} y={y - nodeH / 2} width={5} height={nodeH} rx={2.5} fill={c} />
-            <text x={rightX + 12} y={y - 3} fontSize={12} fontWeight={600} fill="#27272a">
-              {clip(n.label, chars - 6)}
-            </text>
-            <text x={rightX + 12} y={y + 12} fontSize={11} fill="#71717a">
-              {n.sub ? clip(n.sub, chars - 8) : ""}
-            </text>
-            <text x={rightX + colW - 14} y={y + 5} fontSize={13} fontWeight={700} fill={c} textAnchor="end">
-              {formatNumber(n.qty)}
-            </text>
-            <title>{`${n.label}: ${formatNumber(n.qty)}`}</title>
-          </g>
-        );
-      })}
-
-      <rect x={midX} y={midTop} width={midW} height={midH} rx={12} fill="#18181c" />
-      <text x={midX + midW / 2} y={midTop + midH / 2 - 22} textAnchor="middle" fontSize={11} fill="#a1a1aa">
-        THIS ITEM
-      </text>
-      <text x={midX + midW / 2} y={midTop + midH / 2 - 4} textAnchor="middle" fontSize={12} fontWeight={600} fill="#fff">
-        {clip(name, Math.floor((midW - 20) / 7.4))}
-      </text>
-      <text x={midX + midW / 2} y={midTop + midH / 2 + 22} textAnchor="middle" fontSize={22} fontWeight={700} fill="#fff">
+      <rect x={midX} y={midTop} width={midW} height={midH} rx={14} fill="#f1f5f9" stroke="#cbd5e1" />
+      <text x={midX + midW / 2} y={midTop + midH / 2 + 4} textAnchor="middle" fontSize={24} fontWeight={700} fill="#27272a">
         {formatNumber(flow.total)}
       </text>
-      <text x={midX + midW / 2} y={midTop + midH / 2 + 38} textAnchor="middle" fontSize={11} fill="#a1a1aa">
-        pieces in this view
+      <text x={midX + midW / 2} y={midTop + midH / 2 + 22} textAnchor="middle" fontSize={11} fill="#767681">
+        pieces
       </text>
+
+      {left.map((x, i) => (
+        <FlowBlock key={`ln${i}`} x={0} y={x.y} w={nodeW} h={x.h} node={x.n} color={nodeColor(x.n, "src")} side="src" chars={chars} />
+      ))}
+      {right.map((x, i) => (
+        <FlowBlock key={`rn${i}`} x={rightX} y={x.y} w={nodeW} h={x.h} node={x.n} color={nodeColor(x.n, "sink")} side="sink" chars={chars} />
+      ))}
     </svg>
+  );
+}
+
+function FlowBlock({ x, y, w, h, node, color, side, chars }: { x: number; y: number; w: number; h: number; node: FlowNode; color: string; side: "src" | "sink"; chars: number }) {
+  const gap = node.kind === "gap";
+  const cy = y + h / 2 + 4.5;
+  return (
+    <g>
+      <rect x={x} y={y} width={w} height={h} rx={9} fill={color} fillOpacity={0.09} stroke={color} strokeOpacity={0.4} strokeDasharray={gap ? "4 3" : undefined} />
+      <rect x={side === "src" ? x : x + w - 5} y={y} width={5} height={h} rx={2.5} fill={color} />
+      <text x={side === "src" ? x + 16 : x + 12} y={cy} fontSize={13} fontWeight={600} fill="#27272a">
+        {clip(node.label, chars)}
+      </text>
+      <text x={side === "src" ? x + w - 12 : x + w - 18} y={cy} fontSize={14} fontWeight={700} fill={color} textAnchor="end">
+        {formatNumber(node.qty)}
+      </text>
+      <title>{`${node.label}: ${formatNumber(node.qty)}${node.sub ? ` (${node.sub})` : ""}`}</title>
+    </g>
   );
 }
 
 function FlowList({ nodes, side }: { nodes: FlowNode[]; side: "src" | "sink" }) {
   const max = Math.max(...nodes.map((n) => n.qty), 1);
   return (
-    <ul className="space-y-2.5">
+    <ul className="space-y-3">
       {nodes.map((n, i) => {
         const c = nodeColor(n, side);
         return (
@@ -250,10 +281,9 @@ function FlowList({ nodes, side }: { nodes: FlowNode[]; side: "src" | "sink" }) 
                 {formatNumber(n.qty)}
               </span>
             </div>
-            <div className="mt-0.5 h-2 rounded-full bg-ink-100">
-              <div className="h-2 rounded-full" style={{ width: `${Math.max(3, (n.qty / max) * 100)}%`, background: c }} />
+            <div className="mt-1 h-2 rounded-full bg-ink-100">
+              <div className="h-2 rounded-full" style={{ width: `${Math.max(3, (n.qty / max) * 100)}%`, background: c, opacity: n.kind === "gap" ? 0.55 : 1 }} />
             </div>
-            {n.sub && <p className="mt-0.5 text-xs text-ink-500">{n.sub}</p>}
           </li>
         );
       })}
@@ -261,30 +291,23 @@ function FlowList({ nodes, side }: { nodes: FlowNode[]; side: "src" | "sink" }) 
   );
 }
 
-function StackedFlow({ flow, name }: { flow: ProductFlow; name: string }) {
+function StackedFlow({ flow }: { flow: ProductFlow }) {
   return (
-    <div className="space-y-2">
+    <div>
       {flow.sources.length > 0 && (
-        <div className="rounded-xl border border-green-200 bg-green-50/50 p-3">
-          <p className="mb-2 text-xs font-semibold tracking-wide text-green-800">CAME FROM</p>
+        <div>
+          <p className="mb-2 text-[11px] font-semibold tracking-wider text-ink-400">CAME FROM</p>
           <FlowList nodes={flow.sources} side="src" />
         </div>
       )}
-      <div className="flex justify-center text-ink-400" aria-hidden>
-        <ArrowDown className="h-5 w-5" />
-      </div>
-      <div className="rounded-xl bg-ink-900 px-4 py-3 text-center text-white">
-        <p className="text-[11px] tracking-wide text-ink-300">THIS ITEM</p>
-        <p className="truncate text-sm font-semibold">{name}</p>
-        <p className="text-2xl font-bold tabular-nums">{formatNumber(flow.total)}</p>
-        <p className="text-[11px] text-ink-300">pieces in this view</p>
-      </div>
-      <div className="flex justify-center text-ink-400" aria-hidden>
-        <ArrowDown className="h-5 w-5" />
+      <div className="my-4 flex flex-col items-center text-ink-300" aria-hidden>
+        <span className="h-3 w-px bg-ink-300" />
+        <span className="rounded-full border border-ink-200 bg-ink-50 px-3 py-1 text-sm font-semibold tabular-nums text-ink-800">{formatNumber(flow.total)} pieces</span>
+        <ArrowDown className="h-4 w-4" />
       </div>
       {flow.sinks.length > 0 && (
-        <div className="rounded-xl border border-red-200 bg-red-50/50 p-3">
-          <p className="mb-2 text-xs font-semibold tracking-wide text-red-800">WENT TO</p>
+        <div>
+          <p className="mb-2 text-[11px] font-semibold tracking-wider text-ink-400">WENT TO</p>
           <FlowList nodes={flow.sinks} side="sink" />
         </div>
       )}
